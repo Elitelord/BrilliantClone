@@ -17,7 +17,7 @@ interface Props {
 
 const W = 360;
 const H = 250;
-const PAD = { top: 16, right: 16, bottom: 34, left: 38 };
+const PAD = { top: 16, right: 26, bottom: 34, left: 38 };
 
 const STAGES = [1, 2, 3, 4, 5];
 const x = scaleLinear().domain([STAGE_MIN, STAGE_MAX]).range([PAD.left, W - PAD.right]);
@@ -112,8 +112,7 @@ export default function CurveDraw({ config, onChange, disabled, answer, result }
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full touch-none"
-        style={{ maxHeight: 280 }}
+        className="max-h-chart w-full touch-none"
         onPointerMove={handleMove}
         onPointerUp={handleUp}
         onPointerLeave={handleUp}
@@ -192,12 +191,21 @@ export default function CurveDraw({ config, onChange, disabled, answer, result }
                       fill="#fff"
                       stroke={ring}
                       strokeWidth={3}
-                      style={{ cursor: disabled ? 'default' : 'ns-resize' }}
-                      onPointerDown={handleDown(curve, i)}
+                      pointerEvents="none"
                     />
                     {ok !== null && (
                       <circle cx={x(s)} cy={y(vals[i])} r={5} fill={ok ? '#16a34a' : '#f59e0b'} pointerEvents="none" />
                     )}
+                    {/* invisible enlarged hit area for easier touch dragging */}
+                    <circle
+                      cx={x(s)}
+                      cy={y(vals[i])}
+                      r={22}
+                      fill="transparent"
+                      style={{ cursor: disabled ? 'default' : 'ns-resize' }}
+                      pointerEvents={disabled ? 'none' : 'all'}
+                      onPointerDown={handleDown(curve, i)}
+                    />
                   </g>
                 );
               })}

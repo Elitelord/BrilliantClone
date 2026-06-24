@@ -121,6 +121,7 @@ export default function PopulationPyramid({ config, onChange, disabled, answer, 
   const showHandles = !isClassify && !disabled && !isIllustrate;
   const showExploreChip = config.showStagePicker && !isClassify && !isIllustrate;
   const showStagePresets = config.showStagePresets && !isClassify && !isIllustrate;
+  const twoCol = showStagePresets;
   const stageGuess = classifyPyramidControls(controls);
   const chipLabel = formatPyramidStageGuess(stageGuess);
   const chipStage = stageGuess.kind === 'one' ? stageGuess.stage : null;
@@ -146,12 +147,17 @@ export default function PopulationPyramid({ config, onChange, disabled, answer, 
 
   const svgW = isIllustrate ? W + ILLUST_OFFSET : W;
   const midY = (plotTop + plotBottom) / 2;
+  // Keep the pyramid hugging its rendered size so it can sit centered in the card.
+  // Slightly larger than the shared max-h-chart token since this card has room.
+  const pyramidMaxH = 'clamp(210px, 50vh, 460px)';
+  const pyramidMaxW = `calc(${pyramidMaxH} * ${svgW / H})`;
 
   return (
     <div className="w-full select-none">
-      {showExploreChip && (
-        <div className="mb-3 space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className={twoCol ? 'lg:flex lg:items-center lg:gap-4' : ''}>
+      {showExploreChip ? (
+        <div className={twoCol ? 'mb-3 lg:mb-0 lg:flex-1' : 'mb-3'}>
+          <div className="flex flex-col items-start gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-slate-500">Your shape reads as</span>
               <span
@@ -175,13 +181,15 @@ export default function PopulationPyramid({ config, onChange, disabled, answer, 
             )}
           </div>
         </div>
+      ) : (
+        twoCol && <div className="hidden lg:block lg:flex-1" aria-hidden="true" />
       )}
-
+      <div className="mx-auto w-full" style={twoCol ? { maxWidth: pyramidMaxW } : undefined}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${svgW} ${H}`}
-        className="w-full touch-none"
-        style={{ maxHeight: 340 }}
+        className="max-h-chart w-full touch-none"
+        style={twoCol ? { maxHeight: pyramidMaxH } : undefined}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerLeave={onUp}
@@ -312,13 +320,14 @@ export default function PopulationPyramid({ config, onChange, disabled, answer, 
       {isIllustrate && config.caption && (
         <p className="mt-3 text-[15px] leading-relaxed text-slate-700">{config.caption}</p>
       )}
-
+      </div>
+      <div className={twoCol ? 'mt-3 lg:mt-0 lg:flex-1 lg:flex lg:justify-end' : ''}>
       {showStagePresets && (
-        <div className="mt-3">
+        <div>
           <div className="mb-2 text-center text-xs font-medium text-slate-500">
             Tap a stage to see its typical pyramid shape
           </div>
-          <div className="flex justify-center gap-2">
+          <div className="flex justify-center gap-2 lg:flex-col lg:items-center">
             {[1, 2, 3, 4, 5].map((s) => {
               const style = STAGE_CHIP_STYLE[s];
               return (
@@ -341,6 +350,8 @@ export default function PopulationPyramid({ config, onChange, disabled, answer, 
           </div>
         </div>
       )}
+      </div>
+      </div>
 
       {isClassify && (
         <div className="mt-3">

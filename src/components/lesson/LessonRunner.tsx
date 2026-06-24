@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Lesson, Step, ValidationResult } from '../../types/content';
+import type { Interaction, Lesson, Step, ValidationResult } from '../../types/content';
 import type { InteractionState, McState, PyramidState, SectorState, StageSelectState } from '../../types/interaction';
 import { validate, resolveFeedback } from '../../lib/validators';
 import { useProgressStore } from '../../store/progressStore';
@@ -55,6 +55,49 @@ function genericWrongMessage(step: Step): string {
   if (interaction.type === 'rate-sliders') return 'Not quite — think about what keeps a pyramid\'s base wide.';
   if (interaction.type === 'curve-draw') return 'Some points still need adjusting.';
   return resolveFeedback(step.feedback, { correct: false });
+}
+
+// viewBox aspect ratio (width / height) of each SVG-based interaction. Used so
+// the white card can hug the graph's actual rendered width once the chart is
+// height-capped (max-h-chart) and would otherwise letterbox with large empty
+// horizontal space. Non-chart interactions return null (card stays full width).
+function chartAspect(interaction: Interaction): number | null {
+  switch (interaction.type) {
+    case 'rate-graph': {
+      const c = interaction.config;
+      // The population/NIR explore variant lays itself out two-column, so it keeps
+      // the full card width rather than hugging the graph alone.
+      if (!c.overview && !c.historical && c.showPopulationBar !== false) return null;
+      return c.historical ? 360 / 298 : 360 / 252;
+    }
+    case 'country-model':
+      // Lays itself out two-column (readout + graph) on wide screens, so it keeps
+      // the full card width rather than hugging the graph alone.
+      return null;
+    case 'curve-draw':
+      return 360 / 250;
+    case 'stage-select':
+      return 360 / 242;
+    case 'population-pyramid':
+      // The stage-preset explore variant lays out two-column, so keep full card width.
+      if (interaction.config.showStagePresets) return null;
+      return (interaction.config.illustrate ? 356 : 320) / 320;
+    case 'sector-bars':
+      return 320 / 236;
+    default:
+      return null;
+  }
+}
+
+// Card sizing that makes the border hug a height-capped chart (plus padding),
+// centered, on wider screens — while collapsing to full width on phones (where
+// the chart is width-driven and the max-width never binds). Mirrors the
+// `max-h-chart` token: clamp(190px, 46vh, 430px).
+function chartCardStyle(interaction: Interaction): CSSProperties | undefined {
+  const aspect = chartAspect(interaction);
+  if (!aspect) return undefined;
+  // padding: p-4 => 1rem each side => 2rem total.
+  return { maxWidth: `calc(clamp(190px, 46vh, 430px) * ${aspect} + 2rem)` };
 }
 
 export default function LessonRunner({ lesson }: { lesson: Lesson }) {
@@ -182,13 +225,13 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
     step.concept ?? (isExplore && step.feedback.onExplore ? step.feedback.onExplore : undefined);
 
   return (
-    <div className="fixed inset-y-0 left-1/2 flex w-full max-w-lg -translate-x-1/2 flex-col overflow-hidden bg-slate-50">
+    <div className="fixed inset-y-0 left-1/2 flex w-full max-w-2xl -translate-x-1/2 flex-col overflow-hidden bg-slate-50 lg:max-w-6xl">
       {/* top bar — stays pinned so progress is always visible */}
-      <div className="flex flex-none items-center gap-3 px-4 py-3">
+      <div className="pt-safe flex flex-none items-center gap-3 px-4 pb-3">
         <button
           type="button"
           onClick={() => navigate('/')}
-          className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
+          className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
           aria-label="Exit lesson"
         >
           ✕
@@ -215,26 +258,40 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
             </div>
             <h2 className="text-lg font-bold leading-snug text-slate-800">{step.prompt}</h2>
 
-            {step.reference && (
-              <div className="mt-5 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div
+              className={
+                step.reference
+                  ? 'mt-5 grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-6'
+                  : 'mt-5'
+              }
+            >
+              {step.reference && (
+                <div
+                  className="mx-auto min-w-0 w-full rounded-3xl border border-slate-100 bg-white p-4 shadow-sm"
+                  style={chartCardStyle(step.reference)}
+                >
+                  <InteractionRenderer
+                    key={`${step.id}-ref`}
+                    interaction={step.reference}
+                    onChange={() => {}}
+                    disabled
+                  />
+                </div>
+              )}
+
+              <div
+                className="mx-auto min-w-0 w-full rounded-3xl border border-slate-100 bg-white p-4 shadow-sm"
+                style={chartCardStyle(step.interaction)}
+              >
                 <InteractionRenderer
-                  key={`${step.id}-ref`}
-                  interaction={step.reference}
-                  onChange={() => {}}
-                  disabled
+                  key={`${step.id}-${attemptKey}`}
+                  interaction={step.interaction}
+                  answer={step.answer}
+                  onChange={handleChange}
+                  disabled={locked}
+                  result={result}
                 />
               </div>
-            )}
-
-            <div className={`${step.reference ? 'mt-3' : 'mt-5'} rounded-3xl border border-slate-100 bg-white p-4 shadow-sm`}>
-              <InteractionRenderer
-                key={`${step.id}-${attemptKey}`}
-                interaction={step.interaction}
-                answer={step.answer}
-                onChange={handleChange}
-                disabled={locked}
-                result={result}
-              />
             </div>
 
           </motion.div>
@@ -243,7 +300,7 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
 
       {/* pinned action area: the button stays in flow; feedback floats above it
           as an overlay so it never changes layout or creates page scroll. */}
-      <div className="relative flex-none border-t border-slate-100 bg-white px-4 pb-4 pt-3">
+      <div className="pb-safe relative flex-none border-t border-slate-100 bg-white px-4 pt-3">
         {showFeedback && feedback && (
           <div className="pointer-events-none absolute inset-x-0 bottom-full bg-gradient-to-t from-white/40 via-white/15 to-transparent px-4 pb-3 pt-10">
             <div className="pointer-events-auto">
@@ -329,9 +386,10 @@ function CompletionScreen({ lesson }: { lesson: Lesson }) {
   }, [userData]);
 
   return (
-    <div className="fixed inset-y-0 left-1/2 flex w-full max-w-lg -translate-x-1/2 flex-col overflow-hidden bg-slate-50">
+    <div className="fixed inset-y-0 left-1/2 flex w-full max-w-2xl -translate-x-1/2 flex-col overflow-hidden bg-slate-50 lg:max-w-3xl">
       <Celebration />
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 text-center">
+      <div className="pb-safe relative z-10 flex-1 overflow-y-auto px-6 py-8">
+      <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center text-center">
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -400,6 +458,7 @@ function CompletionScreen({ lesson }: { lesson: Lesson }) {
             Back to course path
           </button>
         )}
+      </div>
       </div>
       </div>
     </div>

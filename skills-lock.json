@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "review-loop": {
+      "source": "2dmurali/review-loop-skill",
+      "sourceType": "github",
+      "skillPath": "review-loop/SKILL.md",
+      "computedHash": "1129e4b52d2a1c0f82973a8f31f7747b208d3a83a92e6722b58b133915a41b2c"
+    }
+  }
+}

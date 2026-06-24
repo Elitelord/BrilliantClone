@@ -93,6 +93,8 @@ Make sure `.firebaserc` points to your project ID (`firebase projects:list` to c
 | `npm run dev` | Start the Vite dev server |
 | `npm run build` | Production build to `dist/` |
 | `npm run type-check` | TypeScript check (no emit) |
+| `npm test` | Run unit tests (validators, dtm math, mastery, streaks, persistence) |
+| `npm run test:watch` | Run unit tests in watch mode |
 | `npm run preview` | Preview the production build |
 | `npm run deploy` | Build + deploy to Firebase Hosting |
 

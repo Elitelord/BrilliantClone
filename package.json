@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "preview": "vite preview",
     "deploy": "npm run build && firebase deploy --only hosting,firestore:rules"
   },
@@ -31,6 +33,7 @@
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.12",
     "typescript": "^5.5.4",
-    "vite": "^5.4.6"
+    "vite": "^5.4.6",
+    "vitest": "^3.2.6"
   }
 }

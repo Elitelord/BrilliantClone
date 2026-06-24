@@ -46,6 +46,9 @@ export default function RateGraph({ config, onChange, disabled }: Props) {
   const showNirCurve =
     !overview && (config.showNirCurve || (config.showNirCurveToggle && nirCurveVisible));
   const showStats = config.showStats !== false && !overview;
+  // The population/NIR explore variant splits into two columns on wide screens:
+  // graph + legend + toggle on the left, stats + population bar on the right.
+  const twoCol = !overview && !isHist && config.showPopulationBar !== false;
   // Historical mode needs a top band for the moving "era" marker and a taller
   // bottom band for the icon + year + event timeline.
   const padTop = isHist ? 44 : 16;
@@ -169,11 +172,13 @@ export default function RateGraph({ config, onChange, disabled }: Props) {
 
   return (
     <div className="w-full select-none">
+      <div className={twoCol ? 'lg:grid lg:grid-cols-2 lg:items-center lg:gap-5' : ''}>
+      {/* chart block (left column on desktop): graph + legend + toggle */}
+      <div className={twoCol ? 'lg:min-w-0' : ''}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full touch-none"
-        style={{ maxHeight: isHist ? 340 : 280 }}
+        className="max-h-chart w-full touch-none"
         onPointerDown={handleDown}
         onPointerMove={handleMove}
         onPointerUp={handleUp}
@@ -422,7 +427,10 @@ export default function RateGraph({ config, onChange, disabled }: Props) {
           </button>
         </div>
       )}
+      </div>
 
+      {/* readout block (right column on desktop): stats + population/NIR bar */}
+      <div className={twoCol ? 'lg:min-w-0' : ''}>
       {/* stat panel */}
       {showStats && !overview && (
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -445,6 +453,8 @@ export default function RateGraph({ config, onChange, disabled }: Props) {
           <NirPanel gap={gap} showVerdict={config.showVerdict !== false} />
         </div>
       )}
+      </div>
+      </div>
     </div>
   );
 }

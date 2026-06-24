@@ -6,6 +6,7 @@ import { recommendNext } from '../lib/mastery';
 import { goalMetToday } from '../lib/streak';
 import CoursePath from '../components/path/CoursePath';
 import StreakBadge from '../components/habit/StreakBadge';
+import AppShell from '../components/layout/AppShell';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ export default function HomePage() {
   const rec = data ? recommendNext(getOrderedLessons(), data.progress) : null;
 
   return (
-    <div className="mx-auto w-full max-w-lg px-4 pb-12">
+    <AppShell className="pb-12">
       {/* header */}
       <header className="flex items-center justify-between py-5">
         <div>
@@ -64,6 +65,6 @@ export default function HomePage() {
       <p className="mt-8 text-center text-xs text-slate-300">
         Learn by doing - no videos, no AI. Just you and the ideas.
       </p>
-    </div>
+    </AppShell>
   );
 }

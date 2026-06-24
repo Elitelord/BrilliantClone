@@ -12,6 +12,7 @@ import type {
   CurveDrawAnswer,
   NirSliderAnswer,
   RateSlidersAnswer,
+  StageSelectAnswer,
 } from '../types/content';
 import type {
   RateGraphState,

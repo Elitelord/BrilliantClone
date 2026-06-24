@@ -20,7 +20,7 @@ These require your Firebase project, credentials, or judgment. An AI cannot comp
 | **Create Firestore database** | Done (you confirmed) |
 | **Copy `.env.example` → `.env`** and fill `VITE_FIREBASE_*` values | Done (you confirmed) |
 | **Deploy Firestore rules + Hosting** | Done — https://brilliantclone-b4a2a.web.app |
-| **Run the 5 PDF acceptance tests on the live URL** | **You** — see checklist below |
+| **Run the 5 PDF acceptance tests on the live URL** | **You** — see checklist below (automated lib tests cover validators/mastery/streak logic; UI/auth still manual) |
 | **Commit and push to GitHub** | **You** — repo still mostly uncommitted |
 | **Add deployed URL to README** | Done |
 
@@ -89,6 +89,7 @@ Hand these to Cursor (or similar) in follow-up sessions.
 | Firestore writes unvalidated | `firestore.rules` validates document shapes + bounds |
 | TypeScript check failure | `LessonRunner` narrows `feedback` before `FeedbackBar` |
 | **Resume / refresh lost slide index** | Mount race wrote `stepIndex=0` over saved progress; fixed with `restored` gate + immediate sync on hydrate. Local mirror now writes **before** Firestore. |
+| **Automated unit tests** | Vitest suite in `src/lib/__tests__/` — 86 tests for validators, dtm, mastery, streak, progress normalization. Run `npm test`. |
 
 ---
 

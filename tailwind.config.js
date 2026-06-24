@@ -20,6 +20,14 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'Avenir', 'Helvetica', 'Arial', 'sans-serif'],
       },
+      maxHeight: {
+        // Height-driven so charts fit between the prompt and the pinned footer
+        // without forcing scroll. SVGs keep aspect ratio (letterboxing with side
+        // space when capped), so this never clips — it scales the chart down to
+        // fit the available viewport height. Floor keeps it usable on short
+        // landscape phones; ceiling avoids huge charts on tall desktops.
+        chart: 'clamp(190px, 46vh, 430px)',
+      },
       keyframes: {
         'pop-in': {
           '0%': { transform: 'scale(0.9)', opacity: '0' },

@@ -154,8 +154,11 @@ export default function CountryModel({ config, onChange, disabled }: Props) {
 
   return (
     <div className="w-full select-none">
-      {/* population figures — above graph so fingers don't cover curves */}
-      <div className="mb-3 rounded-xl bg-slate-50 p-3">
+      <div className="lg:grid lg:grid-cols-2 lg:items-center lg:gap-5">
+      {/* left column on desktop: population readout + CBR/CDR/stage stats */}
+      <div>
+      {/* population readout */}
+      <div className="rounded-xl bg-slate-50 p-3">
         <div className="flex items-baseline justify-between">
           <span className="text-sm font-medium text-slate-600">Population</span>
           <motion.span
@@ -189,11 +192,34 @@ export default function CountryModel({ config, onChange, disabled }: Props) {
         </div>
       </div>
 
+      {/* CBR / CDR / stage stats — under the population readout */}
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        <Stat label="Crude birth rate" sub="CBR" value={sample.birth.toFixed(0)} color="#2563eb" />
+        <Stat label="Crude death rate" sub="CDR" value={sample.death.toFixed(0)} color="#dc2626" />
+        <div className="flex flex-col justify-center rounded-xl bg-slate-50 py-2">
+          <div
+            className="mx-auto rounded-full border px-2 py-0.5 text-xs font-bold"
+            style={{
+              background: stageStyle.bg,
+              color: stageStyle.text,
+              borderColor: stageStyle.border,
+            }}
+          >
+            Stage {estStage}
+          </div>
+          <div className="mt-1 text-xs font-bold leading-tight" style={{ color: stageStyle.text }}>
+            {stageName(estStage)}
+          </div>
+        </div>
+      </div>
+      </div>
+
+      {/* right column on desktop: the graph plus its controls */}
+      <div className="mt-3 lg:mt-0 lg:min-w-0">
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full touch-none"
-        style={{ maxHeight: 260 }}
+        className="max-h-chart w-full touch-none"
         onPointerDown={handleDown}
         onPointerMove={handleMove}
         onPointerUp={handleUp}
@@ -292,25 +318,7 @@ export default function CountryModel({ config, onChange, disabled }: Props) {
           Crude death rate (CDR)
         </span>
       </div>
-
-      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-        <Stat label="Crude birth rate" sub="CBR" value={sample.birth.toFixed(0)} color="#2563eb" />
-        <Stat label="Crude death rate" sub="CDR" value={sample.death.toFixed(0)} color="#dc2626" />
-        <div className="flex flex-col justify-center rounded-xl bg-slate-50 py-2">
-          <div
-            className="mx-auto rounded-full border px-2 py-0.5 text-xs font-bold"
-            style={{
-              background: stageStyle.bg,
-              color: stageStyle.text,
-              borderColor: stageStyle.border,
-            }}
-          >
-            Stage {estStage}
-          </div>
-          <div className="mt-1 text-xs font-bold leading-tight" style={{ color: stageStyle.text }}>
-            {stageName(estStage)}
-          </div>
-        </div>
+      </div>
       </div>
     </div>
   );

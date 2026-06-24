@@ -40,7 +40,7 @@ export default function RateSliders({ config, onChange, disabled }: Props) {
           <span className="text-slate-400">−</span>
           <span className="text-red-600">{death}</span>
           <span className="text-slate-500">=</span>
-          <span className="text-3xl font-extrabold tabular-nums" style={{ color: nirColor }}>
+          <span className="text-2xl font-extrabold tabular-nums lg:text-3xl" style={{ color: nirColor }}>
             {gap >= 0 ? '+' : ''}
             {gap}
           </span>

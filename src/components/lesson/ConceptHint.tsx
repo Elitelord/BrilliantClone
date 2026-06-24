@@ -26,7 +26,7 @@ export default function ConceptHint({ text }: { text: string }) {
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full z-20 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-3.5 text-left text-sm leading-relaxed text-slate-600 shadow-lg"
+          className="absolute right-0 top-full z-20 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-3.5 text-left text-sm leading-relaxed text-slate-600 shadow-lg"
         >
           {text}
         </div>

@@ -94,13 +94,15 @@ export default function NirPanel({
 
       <div
         ref={barRef}
-        className={`relative mt-2 rounded-full bg-slate-200 py-1 ${interactive && !disabled ? 'cursor-ew-resize touch-none' : ''}`}
+        className={`relative mt-2 flex items-center ${
+          interactive && !disabled ? 'min-h-[44px] cursor-ew-resize touch-none' : 'py-1'
+        }`}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerLeave={onUp}
       >
-        <div className="relative h-3 w-full">
+        <div className="relative h-3 w-full rounded-full bg-slate-200">
           {fillWidth > 0 && (
             <div
               className={`absolute top-0 h-full ${fillRadius}`}

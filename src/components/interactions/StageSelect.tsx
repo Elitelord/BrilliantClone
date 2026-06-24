@@ -83,8 +83,7 @@ export default function StageSelect({ config, onChange, disabled, result }: Prop
     <div className="w-full select-none">
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full touch-none"
-        style={{ maxHeight: 280 }}
+        className="max-h-chart w-full touch-none"
         role="img"
         aria-label="Tap the demographic stage that matches the scenario"
       >

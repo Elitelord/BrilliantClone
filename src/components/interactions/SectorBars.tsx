@@ -99,8 +99,7 @@ export default function SectorBars({ config, onChange, disabled }: Props) {
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full touch-none"
-        style={{ maxHeight: 260 }}
+        className="max-h-chart w-full touch-none"
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerLeave={onUp}
