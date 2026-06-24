@@ -1,0 +1,145 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function isKnownLessonId(id) {
+      return id in ['dtm-engine', 'population-pyramids', 'sector-shift'];
+    }
+
+    function isDateKey(s) {
+      return s is string && s.size() == 10;
+    }
+
+    function isWholeNumber(n) {
+      return n is number && n >= 0;
+    }
+
+    function isValidStreak(data) {
+      return data.keys().hasOnly(['count', 'lastActiveDate', 'charges', 'problemsToday', 'todayDate', 'longest'])
+        && isWholeNumber(data.count)
+        && data.count <= 10000
+        && isWholeNumber(data.charges)
+        && data.charges <= 100
+        && isWholeNumber(data.problemsToday)
+        && data.problemsToday <= 1000
+        && isWholeNumber(data.longest)
+        && data.longest <= 10000
+        && (data.lastActiveDate == '' || isDateKey(data.lastActiveDate))
+        && isDateKey(data.todayDate);
+    }
+
+    function isValidLessonProgress(data, docId) {
+      return data.keys().hasOnly([
+          'lessonId',
+          'finishedOnce',
+          'playState',
+          'currentStepIndex',
+          'completedStepIds',
+          'firstTryCorrect',
+          'attempts',
+          'score',
+          'updatedAt',
+        ])
+        && data.lessonId is string
+        && data.lessonId == docId
+        && isKnownLessonId(data.lessonId)
+        && data.finishedOnce is bool
+        && data.playState is string
+        && data.playState in ['not_started', 'in_progress']
+        && isWholeNumber(data.currentStepIndex)
+        && data.currentStepIndex <= 100
+        && data.completedStepIds is list
+        && data.completedStepIds.size() <= 50
+        && data.firstTryCorrect is map
+        && data.attempts is map
+        && isWholeNumber(data.score)
+        && data.score <= 100
+        && isWholeNumber(data.updatedAt)
+        && data.updatedAt > 0;
+    }
+
+    function isValidMastery(data, docId) {
+      return data.conceptId is string
+        && data.conceptId == docId
+        && data.conceptId.size() <= 64
+        && data.strength is number
+        && data.strength >= 0
+        && data.strength <= 1
+        && isWholeNumber(data.lastSeen)
+        && data.lastSeen > 0
+        && isWholeNumber(data.wrongCount)
+        && data.wrongCount <= 10000
+        && (
+          data.keys().hasOnly(['conceptId', 'strength', 'lastSeen', 'wrongCount'])
+          || (
+            data.keys().hasOnly(['conceptId', 'strength', 'lastSeen', 'wrongCount', 'nextDue'])
+            && isWholeNumber(data.nextDue)
+            && data.nextDue > 0
+          )
+        );
+    }
+
+    function validUserCreate() {
+      return request.resource.data.keys().hasAll(['displayName', 'createdAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.displayName.size() <= 100
+        && isWholeNumber(request.resource.data.createdAt)
+        && request.resource.data.createdAt > 0
+        && (
+          !('email' in request.resource.data)
+          || request.resource.data.email == null
+          || (request.resource.data.email is string && request.resource.data.email.size() <= 320)
+        )
+        && (
+          !('streak' in request.resource.data)
+          || isValidStreak(request.resource.data.streak)
+        );
+    }
+
+    function validUserUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return (
+        (changed.hasOnly(['streak']) && isValidStreak(request.resource.data.streak))
+        || (
+          changed.hasOnly(['displayName', 'email', 'createdAt', 'streak'])
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() > 0
+          && request.resource.data.displayName.size() <= 100
+          && request.resource.data.createdAt == resource.data.createdAt
+          && (
+            !('email' in request.resource.data)
+            || request.resource.data.email == null
+            || (request.resource.data.email is string && request.resource.data.email.size() <= 320)
+          )
+          && isValidStreak(request.resource.data.streak)
+        )
+      );
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && validUserCreate();
+      allow update: if isOwner(userId) && validUserUpdate();
+      allow delete: if false;
+
+      match /progress/{lessonId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && isKnownLessonId(lessonId)
+          && isValidLessonProgress(request.resource.data, lessonId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /mastery/{conceptId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && isValidMastery(request.resource.data, conceptId);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
