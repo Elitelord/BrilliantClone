@@ -16,11 +16,12 @@
   "dependencies": {
     "d3-scale": "^4.0.2",
     "d3-shape": "^3.2.0",
-    "firebase": "^10.13.2",
+    "firebase": "^12.15.0",
     "framer-motion": "^11.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2",
+    "react-simple-maps": "^3.0.0",
     "zustand": "^4.5.5"
   },
   "devDependencies": {
@@ -28,12 +29,14 @@
     "@types/d3-shape": "^3.1.6",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
+    "@types/react-simple-maps": "^3.0.6",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.12",
     "typescript": "^5.5.4",
     "vite": "^5.4.6",
-    "vitest": "^3.2.6"
+    "vitest": "^3.2.6",
+    "world-atlas": "^2.0.2"
   }
 }

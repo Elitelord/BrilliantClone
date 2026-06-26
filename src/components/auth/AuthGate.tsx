@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useProgressStore } from '../../store/progressStore';
-import FullSpinner from '../common/Spinner';
+import { FullSpinner } from '../common/Spinner';
 
 export default function AuthGate() {
   const profile = useAuthStore((s) => s.profile);

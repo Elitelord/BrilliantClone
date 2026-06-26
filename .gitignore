@@ -26,3 +26,6 @@ firestore-debug.log
 probe_*.txt
 shell_probe*.txt
 node_check.txt
+
+# agent skills (installed locally; see skills-lock.json for sources)
+.agents/

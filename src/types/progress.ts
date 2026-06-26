@@ -18,8 +18,16 @@ export interface LessonProgress {
   firstTryCorrect: Record<string, boolean>;
   // total wrong attempts per step id (drives "review" surfacing)
   attempts: Record<string, number>;
+  /** Latest wrong-check details per step (for AI skill-check personalization). */
+  attemptNotes?: Record<string, StepAttemptNote>;
   score: number; // 0..100, share of steps answered correctly on first try
   updatedAt: number;
+}
+
+/** Snapshot from the learner's most recent wrong check on a step. */
+export interface StepAttemptNote {
+  lastOutcome?: string;
+  lastWrongSummary?: string;
 }
 
 export interface MasteryRecord {

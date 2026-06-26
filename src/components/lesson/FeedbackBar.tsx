@@ -7,6 +7,9 @@ interface Props {
   message: string;
   concept?: string;
   onDismiss?: () => void;
+  /** AI follow-up on wrong answers (tailored nudge). */
+  followUp?: string | null;
+  followUpLoading?: boolean;
 }
 
 const TONE = {
@@ -33,7 +36,14 @@ const TONE = {
   },
 };
 
-export default function FeedbackBar({ tone, message, concept, onDismiss }: Props) {
+export default function FeedbackBar({
+  tone,
+  message,
+  concept,
+  onDismiss,
+  followUp,
+  followUpLoading,
+}: Props) {
   const t = TONE[tone];
   return (
     <motion.div
@@ -48,6 +58,12 @@ export default function FeedbackBar({ tone, message, concept, onDismiss }: Props
         <div className={`min-w-0 flex-1 text-sm leading-relaxed ${t.text}`}>
           <p className="font-medium">{message}</p>
           {concept && <p className="mt-2 text-[13px] opacity-90">{concept}</p>}
+          {followUpLoading && (
+            <p className="mt-2 text-[13px] opacity-80">Tailoring feedback to your attempt…</p>
+          )}
+          {followUp && (
+            <p className="mt-2 text-[13px] opacity-90">{followUp}</p>
+          )}
         </div>
         {onDismiss && (
           <button

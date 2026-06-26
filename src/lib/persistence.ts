@@ -265,6 +265,10 @@ export async function persistProgress(profile: UserProfile, lp: LessonProgress):
   }
 }
 
+function firestoreSafe<T extends object>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj)) as T;
+}
+
 export async function persistMastery(profile: UserProfile, records: MasteryRecord[]): Promise<void> {
   mirrorLocal(profile, (d) => {
     for (const r of records) d.mastery[r.conceptId] = r;
@@ -272,7 +276,9 @@ export async function persistMastery(profile: UserProfile, records: MasteryRecor
   if (!useFirestore(profile)) return;
   try {
     await Promise.all(
-      records.map((r) => setDoc(doc(db!, 'users', profile.uid, 'mastery', r.conceptId), r)),
+      records.map((r) =>
+        setDoc(doc(db!, 'users', profile.uid, 'mastery', r.conceptId), firestoreSafe(r)),
+      ),
     );
   } catch (e) {
     console.warn('persistMastery failed (kept locally).', e);

@@ -84,8 +84,7 @@ export const populationPyramids: Lesson = {
       kind: 'predict',
       prompt:
         'This pyramid has a very wide base. Set birth and death rates that would produce lots of young children.',
-      concept: 'A wide base is a direct sign of a high birth rate — each new generation is bigger than the last.',
-      concepts: ['pyramid-shape'],
+      concepts: ['pyramid-shape', 'dtm-stages'],
       difficulty: 1,
       reference: {
         type: 'population-pyramid',
@@ -108,8 +107,6 @@ export const populationPyramids: Lesson = {
       id: 'pick-stage1-pyramid',
       kind: 'predict',
       prompt: 'Which pyramid shows Stage 1 (High Stationary)? Birth and death rates are both high.',
-      concept:
-        'Stage 1 looks like a wide-base triangle with a steep drop — many babies, but high death rates mean few people reach old age.',
       concepts: ['pyramid-shape', 'dtm-stages'],
       difficulty: 2,
       interaction: {
@@ -125,15 +122,14 @@ export const populationPyramids: Lesson = {
       },
       answer: { correctId: 'stage1' },
       feedback: {
-        correct: 'Remember — birth and death rates are both high in this stage.',
-        incorrect: 'Look for a very wide base that drops off quickly toward the top.',
+        correct: 'Correct — birth and death rates are both high in this stage.',
+        incorrect: 'Incorrect — birth and death rates are both high in this stage.',
       },
     },
     {
       id: 'solve-stage2-shape',
       kind: 'solve',
       prompt: 'Reshape the pyramid into a youthful, fast-growing country (Stage 2): give it a wide base.',
-      concept: 'A broad-based triangle is the classic Stage 2 shape — high birth rates and a very young population.',
       concepts: ['pyramid-shape', 'dtm-stages'],
       difficulty: 2,
       interaction: {
@@ -154,7 +150,6 @@ export const populationPyramids: Lesson = {
       id: 'classify-niger',
       kind: 'solve',
       prompt: 'This is Niger\'s population pyramid. Which DTM stage does its shape suggest?',
-      concept: 'Niger has one of the world\'s highest birth rates — its enormous base places it firmly in Stage 2.',
       concepts: ['pyramid-classify', 'dtm-stages'],
       difficulty: 2,
       interaction: {
@@ -171,8 +166,6 @@ export const populationPyramids: Lesson = {
       id: 'solve-brazil-stage3',
       kind: 'solve',
       prompt: 'Drag the pyramid to match Brazil — Stage 3.',
-      concept:
-        'Brazil is in Late Expanding: death rates have fallen, births are starting to drop, so the pyramid tapers more than Stage 2 but is still clearly triangular.',
       concepts: ['pyramid-shape', 'dtm-stages'],
       difficulty: 2,
       interaction: {
@@ -194,7 +187,6 @@ export const populationPyramids: Lesson = {
       kind: 'connect',
       prompt:
         'This is Japan. The youngest row (bottom) is the narrowest. Which DTM stage does this inverted shape suggest?',
-      concept: 'When the base is narrower than the middle, there are more elderly than children — the hallmark of Stage 5 decline.',
       concepts: ['pyramid-classify', 'dtm-stages'],
       difficulty: 3,
       interaction: {
@@ -211,7 +203,6 @@ export const populationPyramids: Lesson = {
       id: 'solve-stage4-shape',
       kind: 'solve',
       prompt: 'Reshape into a Stage 4 country pyramid.',
-      concept: 'When births and deaths are both low, age groups are roughly equal in size — the pyramid becomes a column.',
       concepts: ['pyramid-shape', 'dtm-stages'],
       difficulty: 2,
       interaction: {
@@ -232,7 +223,6 @@ export const populationPyramids: Lesson = {
       id: 'classify-usa',
       kind: 'connect',
       prompt: 'This is the United States. Which DTM stage does its shape suggest?',
-      concept: 'Even, column-like bars with low births and low deaths are the textbook Stage 4 shape.',
       concepts: ['pyramid-classify', 'dtm-stages'],
       difficulty: 2,
       interaction: {
@@ -243,6 +233,31 @@ export const populationPyramids: Lesson = {
       feedback: {
         correct: 'Right — even bars and a steady base is the stable Stage 4 column.',
         incorrect: 'Look at the overall shape and try another stage.',
+      },
+    },
+    {
+      id: 'explain-wide-base',
+      kind: 'connect',
+      prompt: 'Why does a wide-based pyramid mean a high birth rate?',
+      concepts: ['pyramid-shape', 'natural-increase'],
+      difficulty: 2,
+      interaction: {
+        type: 'explain-back',
+        config: {
+          question: 'Explain what a wide base on a population pyramid tells you about births.',
+          rubric: [
+            'A wide base means many young people / children.',
+            'Many children reflect a high crude birth rate.',
+            'This shape is typical of Stage 2 (early expanding).',
+          ],
+          sampleAnswer:
+            'A wide base means lots of young people were born recently, so the birth rate is high. That triangular shape is classic Stage 2, when deaths have fallen but births are still high.',
+          minChars: 20,
+        },
+      },
+      feedback: {
+        correct: 'You connected pyramid shape to birth rate clearly.',
+        incorrect: 'Mention the wide base, young population, and high births.',
       },
     },
   ],

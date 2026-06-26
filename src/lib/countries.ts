@@ -74,9 +74,64 @@ const japan: CountryData = {
   ],
 };
 
-export const COUNTRIES: Record<string, CountryData> = { england, nigeria, japan };
+const southKorea: CountryData = {
+  id: 'south-korea',
+  name: 'South Korea',
+  flag: '🇰🇷',
+  tagline: 'Compressed transition — decades, not centuries',
+  series: [
+    { year: 1950, birth: 42, death: 18, pop: 19.2 },
+    { year: 1970, birth: 31, death: 9, pop: 32.2 },
+    { year: 1990, birth: 16, death: 6, pop: 42.9 },
+    { year: 2000, birth: 13, death: 6, pop: 47.0 },
+    { year: 2010, birth: 10, death: 6, pop: 49.4 },
+    { year: 2020, birth: 6.3, death: 6.9, pop: 51.8 },
+    { year: 2023, birth: 5.1, death: 7.8, pop: 51.7 },
+  ],
+};
 
-export const COUNTRY_ORDER = ['england', 'nigeria', 'japan'];
+const uae: CountryData = {
+  id: 'uae',
+  name: 'United Arab Emirates',
+  flag: '🇦🇪',
+  tagline: 'Population boom driven by labor migration',
+  series: [
+    { year: 1970, birth: 38, death: 12, pop: 0.3 },
+    { year: 1990, birth: 22, death: 4, pop: 1.9 },
+    { year: 2000, birth: 17, death: 3, pop: 3.1 },
+    { year: 2010, birth: 12, death: 2, pop: 8.1 },
+    { year: 2020, birth: 10, death: 2, pop: 9.9 },
+    { year: 2023, birth: 9, death: 2, pop: 10.4 },
+  ],
+};
+
+const niger: CountryData = {
+  id: 'niger',
+  name: 'Niger',
+  flag: '🇳🇪',
+  tagline: 'Prolonged Stage 2 — births still high',
+  series: [
+    { year: 1950, birth: 52, death: 32, pop: 2.5 },
+    { year: 1970, birth: 54, death: 26, pop: 4.0 },
+    { year: 1990, birth: 52, death: 20, pop: 7.8 },
+    { year: 2000, birth: 50, death: 17, pop: 10.9 },
+    { year: 2010, birth: 48, death: 14, pop: 15.9 },
+    { year: 2020, birth: 44, death: 11, pop: 24.2 },
+    { year: 2023, birth: 42, death: 10, pop: 27.2 },
+  ],
+};
+
+// Keyed by each country's `id` (not the JS variable name) so lookups like
+// getCountry('south-korea') resolve correctly. Building the record from `.id`
+// prevents the camelCase-key vs kebab-case-id mismatch that previously made
+// 'south-korea' fall through to the England fallback.
+const ALL_COUNTRIES: CountryData[] = [england, nigeria, japan, southKorea, uae, niger];
+
+export const COUNTRIES: Record<string, CountryData> = Object.fromEntries(
+  ALL_COUNTRIES.map((c) => [c.id, c]),
+);
+
+export const COUNTRY_ORDER = ALL_COUNTRIES.map((c) => c.id);
 
 export function getCountry(id: string): CountryData {
   return COUNTRIES[id] ?? england;

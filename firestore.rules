@@ -6,7 +6,14 @@ service cloud.firestore {
     }
 
     function isKnownLessonId(id) {
-      return id in ['dtm-engine', 'population-pyramids', 'sector-shift'];
+      return id in [
+        'dtm-engine',
+        'population-pyramids',
+        'sector-shift',
+        'epi-transition',
+        'population-structure',
+        'model-breaks',
+      ];
     }
 
     function isDateKey(s) {
@@ -32,7 +39,8 @@ service cloud.firestore {
     }
 
     function isValidLessonProgress(data, docId) {
-      return data.keys().hasOnly([
+      return (
+        data.keys().hasOnly([
           'lessonId',
           'finishedOnce',
           'playState',
@@ -43,6 +51,19 @@ service cloud.firestore {
           'score',
           'updatedAt',
         ])
+        || data.keys().hasOnly([
+          'lessonId',
+          'finishedOnce',
+          'playState',
+          'currentStepIndex',
+          'completedStepIds',
+          'firstTryCorrect',
+          'attempts',
+          'attemptNotes',
+          'score',
+          'updatedAt',
+        ])
+      )
         && data.lessonId is string
         && data.lessonId == docId
         && isKnownLessonId(data.lessonId)
@@ -55,6 +76,10 @@ service cloud.firestore {
         && data.completedStepIds.size() <= 50
         && data.firstTryCorrect is map
         && data.attempts is map
+        && (
+          !('attemptNotes' in data)
+          || (data.attemptNotes is map && data.attemptNotes.size() <= 50)
+        )
         && isWholeNumber(data.score)
         && data.score <= 100
         && isWholeNumber(data.updatedAt)

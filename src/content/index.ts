@@ -1,7 +1,10 @@
 import type { Course, Lesson } from '../types/content';
 import { dtmEngine } from './lessons/dtmEngine';
 import { populationPyramids } from './lessons/populationPyramids';
-import { sectorShift } from './lessons/sectorShift';
+import { epiTransition } from './lessons/epiTransition';
+import { populationStructure } from './lessons/populationStructure';
+import { modelBreaks } from './lessons/modelBreaks';
+import { placeCountry } from './lessons/placeCountry';
 
 export const dtmCourse: Course = {
   id: 'dtm',
@@ -9,13 +12,16 @@ export const dtmCourse: Course = {
   subject: 'AP Human Geography',
   description:
     'Learn how and why populations grow, stabilize, and shrink as countries develop - by doing, not memorizing.',
-  lessonIds: ['dtm-engine', 'population-pyramids', 'sector-shift'],
+  lessonIds: ['dtm-engine', 'population-pyramids', 'epi-transition', 'population-structure', 'model-breaks', 'place-country'],
 };
 
 const LESSONS: Record<string, Lesson> = {
   [dtmEngine.id]: dtmEngine,
   [populationPyramids.id]: populationPyramids,
-  [sectorShift.id]: sectorShift,
+  [epiTransition.id]: epiTransition,
+  [populationStructure.id]: populationStructure,
+  [modelBreaks.id]: modelBreaks,
+  [placeCountry.id]: placeCountry,
 };
 
 export function getLesson(id: string): Lesson | undefined {

@@ -1,17 +1,25 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Interaction, Lesson, Step, ValidationResult } from '../../types/content';
-import type { InteractionState, McState, PyramidState, SectorState, StageSelectState } from '../../types/interaction';
-import { validate, resolveFeedback } from '../../lib/validators';
+import type { InteractionState, McState, MatchPairsState, PyramidState, PyramidPickState, ChartPickState, SectorState, StageSelectState, CategoryBarsState, FamilySizeState, AnomalyPyramidState, MigrationFlowState, ExplainBackState, WorldMapState } from '../../types/interaction';
+import { validate, resolveFeedback, resolveWrongFeedback } from '../../lib/validators';
 import { useProgressStore } from '../../store/progressStore';
 import { getOrderedLessons } from '../../content';
 import { recommendNext, computeLessonScore, countFirstTryCorrect, isLessonComplete, isLessonUnlocked } from '../../lib/mastery';
+import { isAiEnabled, buildStepContext, describeInteraction } from '../../lib/ai';
+import { playableSteps, toFullStepIndex, toPlayableStepIndex } from '../../lib/ai/lessonSteps';
+import { safeAuthoredHint } from '../../lib/ai/hintGuard';
+import { getWrongAnswerNudge } from '../../lib/ai/features/wrongAnswerNudge';
+import { gradeExplanation } from '../../lib/ai/features/explainBack';
 import InteractionRenderer from '../interactions/InteractionRenderer';
 import StepProgress from './StepProgress';
 import FeedbackBar, { type FeedbackTone } from './FeedbackBar';
 import ConceptHint from './ConceptHint';
 import Celebration from './Celebration';
+import SkillCheck from './SkillCheck';
+
+const EXPLAIN_GRADE_RETRY_MS = 15_000;
 
 function canCheck(step: Step, st: InteractionState | null): boolean {
   if (!st) return false;
@@ -22,6 +30,52 @@ function canCheck(step: Step, st: InteractionState | null): boolean {
     return (st as PyramidState).selectedStage != null;
   if (interaction.type === 'sector-bars' && interaction.config.mode === 'classify')
     return (st as SectorState).selectedStage != null;
+  if (interaction.type === 'match-pairs') {
+    const p = (st as MatchPairsState).placements;
+    if (interaction.config.multiPerTile) {
+      // Multi-category mode: if a per-tile cap is set, require every tile filled to
+      // exactly that many categories; otherwise just require each placed somewhere.
+      const cap = interaction.config.maxPerTile;
+      return interaction.config.tiles.every((t) => {
+        const count = Object.values(p).filter((arr) => arr.includes(t.id)).length;
+        return cap != null ? count === cap : count > 0;
+      });
+    }
+    if (interaction.config.multiPerSlot) {
+      // Bucket mode: require every TILE to be placed somewhere.
+      return interaction.config.tiles.every((t) => Object.values(p).some((arr) => arr.includes(t.id)));
+    }
+    // Single-match mode: require every slot to hold a tile.
+    return interaction.config.slots.every((s) => (p[s.id]?.length ?? 0) > 0);
+  }
+  if (interaction.type === 'pyramid-pick') return (st as PyramidPickState).selectedStages.length > 0;
+  if (interaction.type === 'chart-pick') return (st as ChartPickState).selectedId != null;
+  if (interaction.type === 'category-bars' && interaction.config.mode === 'adjust') {
+    const fig = (st as CategoryBarsState).figures;
+    return fig.infectious + fig.famine + fig.accidents + fig.chronic >= 4;
+  }
+  if (interaction.type === 'family-size' && interaction.config.mode === 'adjust') {
+    return (st as FamilySizeState).children > 0;
+  }
+  if (interaction.type === 'anomaly-pyramid' && interaction.config.mode === 'adjust') {
+    const s = st as AnomalyPyramidState;
+    return (s.maleCohorts?.length ?? 0) === 9 && (s.femaleCohorts?.length ?? 0) === 9;
+  }
+  if (interaction.type === 'explain-back') {
+    const min = interaction.config.minChars ?? 15;
+    return ((st as ExplainBackState).text?.trim().length ?? 0) >= min;
+  }
+  if (interaction.type === 'migration-flow') {
+    const s = st as MigrationFlowState;
+    return s.inMigration > 0 || s.outMigration > 0;
+  }
+  if (interaction.type === 'world-map' && interaction.config.mode === 'pick') {
+    return (st as WorldMapState).selectedId != null;
+  }
+  if (interaction.type === 'world-map' && interaction.config.mode === 'pick-multi') {
+    const required = (step.answer as { countryIds?: string[] } | undefined)?.countryIds?.length ?? 0;
+    return (st as WorldMapState).selectedIds?.length === required;
+  }
   return true;
 }
 
@@ -32,29 +86,10 @@ function isSelectionStep(step: Step): boolean {
   if (interaction.type === 'multiple-choice' || interaction.type === 'stage-select') return true;
   if (interaction.type === 'population-pyramid' && interaction.config.mode === 'classify') return true;
   if (interaction.type === 'sector-bars' && interaction.config.mode === 'classify') return true;
+  if (interaction.type === 'pyramid-pick') return true;
+  if (interaction.type === 'chart-pick') return true;
+  if (interaction.type === 'world-map' && (interaction.config.mode === 'pick' || interaction.config.mode === 'pick-multi')) return true;
   return false;
-}
-
-function suppressWrongHint(step: Step): boolean {
-  const { interaction } = step;
-  if (interaction.type === 'multiple-choice') return true;
-  if (interaction.type === 'population-pyramid') return true;
-  if (interaction.type === 'rate-graph' && interaction.config.snap) return true;
-  if (interaction.type === 'rate-sliders' || interaction.type === 'nir-slider') return true;
-  if (interaction.type === 'curve-draw') return true;
-  return false;
-}
-
-function genericWrongMessage(step: Step): string {
-  const { interaction } = step;
-  if (interaction.type === 'multiple-choice') return 'Not quite — try again.';
-  if (interaction.type === 'population-pyramid' && interaction.config.mode === 'classify') {
-    return 'That stage doesn\'t match — try again.';
-  }
-  if (interaction.type === 'population-pyramid') return 'Keep adjusting — the shape isn\'t right yet.';
-  if (interaction.type === 'rate-sliders') return 'Not quite — think about what keeps a pyramid\'s base wide.';
-  if (interaction.type === 'curve-draw') return 'Some points still need adjusting.';
-  return resolveFeedback(step.feedback, { correct: false });
 }
 
 // viewBox aspect ratio (width / height) of each SVG-based interaction. Used so
@@ -79,11 +114,33 @@ function chartAspect(interaction: Interaction): number | null {
     case 'stage-select':
       return 360 / 242;
     case 'population-pyramid':
+      // Band+ratio explore uses a two-column-friendly layout; keep full card width.
+      if (interaction.config.showDependencyRatio) return null;
       // The stage-preset explore variant lays out two-column, so keep full card width.
       if (interaction.config.showStagePresets) return null;
       return (interaction.config.illustrate ? 356 : 320) / 320;
-    case 'sector-bars':
+    case 'sector-bars': {
+      const c = interaction.config;
+      // The explore variant (implied stage / stage presets) lays out two-column,
+      // so keep the full card width rather than hugging the bars alone.
+      if (c.mode === 'adjust' && (c.showImpliedStage || c.showStagePresets)) return null;
       return 320 / 236;
+    }
+    case 'three-lens':
+      return null;
+    case 'category-bars':
+      // Bucket columns + development slider use a two-column layout on wide screens.
+      return null;
+    case 'family-size':
+      // Figurine panel + development slider use a two-column layout on wide screens.
+      return null;
+    case 'anomaly-pyramid':
+      if (interaction.config.mode === 'adjust') return null;
+      return null;
+    case 'migration-flow':
+      return null;
+    case 'world-map':
+      return null;
     default:
       return null;
   }
@@ -94,6 +151,11 @@ function chartAspect(interaction: Interaction): number | null {
 // the chart is width-driven and the max-width never binds). Mirrors the
 // `max-h-chart` token: clamp(190px, 46vh, 430px).
 function chartCardStyle(interaction: Interaction): CSSProperties | undefined {
+  if (interaction.type === 'world-map') {
+    const mode = interaction.config.mode ?? 'explore';
+    const showCard = interaction.config.showDataCard ?? (mode === 'explore');
+    return showCard ? { maxWidth: '56rem' } : { maxWidth: '36rem' };
+  }
   const aspect = chartAspect(interaction);
   if (!aspect) return undefined;
   // padding: p-4 => 1rem each side => 2rem total.
@@ -117,6 +179,32 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
   // Gate step→store sync until restore-from-saved-progress finishes (avoids
   // writing stepIndex=0 over a saved mid-lesson index on mount).
   const [restored, setRestored] = useState(false);
+  const [phase, setPhase] = useState<'lesson' | 'skillCheck' | 'complete'>('lesson');
+  const [hintMessage, setHintMessage] = useState<string | null>(null);
+  const [wrongNudgeLoading, setWrongNudgeLoading] = useState(false);
+  const [wrongNudge, setWrongNudge] = useState<string | null>(null);
+  const [isGrading, setIsGrading] = useState(false);
+  const [explainAiFeedback, setExplainAiFeedback] = useState<string | null>(null);
+  const [explainSkipped, setExplainSkipped] = useState(false);
+  const [explainRetryWaiting, setExplainRetryWaiting] = useState(false);
+  const explainRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const explainGradeGenRef = useRef(0);
+
+  const activeSteps = useMemo(() => playableSteps(lesson, isAiEnabled), [lesson, isAiEnabled]);
+
+  const clearExplainRetrySchedule = () => {
+    if (explainRetryTimerRef.current) {
+      clearTimeout(explainRetryTimerRef.current);
+      explainRetryTimerRef.current = null;
+    }
+    setExplainRetryWaiting(false);
+  };
+
+  const cancelExplainGrading = () => {
+    explainGradeGenRef.current += 1;
+    clearExplainRetrySchedule();
+    setIsGrading(false);
+  };
 
   // Run once on lesson entry — never during render (that caused re-render loops).
   useEffect(() => {
@@ -124,46 +212,168 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
     store.ensureLessonStarted(lesson);
     store.reopenLessonIfComplete(lesson);
     const p = store.getLessonProgress(lesson.id);
-    const idx = p ? Math.min(p.currentStepIndex, lesson.steps.length - 1) : 0;
+    const savedFull = p ? p.currentStepIndex : 0;
+    const idx = toPlayableStepIndex(lesson, savedFull, isAiEnabled);
     setStepIndex(idx);
-    store.setCurrentStep(lesson.id, idx);
+    const fullIdx = toFullStepIndex(lesson, playableSteps(lesson, isAiEnabled)[idx] ?? lesson.steps[0]);
+    store.setCurrentStep(lesson.id, fullIdx >= 0 ? fullIdx : 0);
     setIState(null);
     setResult(null);
     setLocked(false);
     setAttemptKey(0);
     setFinished(false);
     setSessionWrong({});
+    setPhase('lesson');
+    setHintMessage(null);
+    setExplainAiFeedback(null);
+    setExplainSkipped(false);
+    clearExplainRetrySchedule();
     setRestored(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson.id]);
 
+  useEffect(() => () => clearExplainRetrySchedule(), []);
+
   // Keep the saved step in sync so exit/re-enter resumes at the right slide.
   useEffect(() => {
     if (!restored) return;
-    store.setCurrentStep(lesson.id, stepIndex);
+    const step = activeSteps[stepIndex];
+    if (!step) return;
+    store.setCurrentStep(lesson.id, toFullStepIndex(lesson, step));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lesson.id, stepIndex, restored]);
+  }, [lesson.id, stepIndex, restored, activeSteps]);
 
   useEffect(() => {
     setFeedbackDismissed(false);
+    setHintMessage(null);
+    setWrongNudge(null);
+    setExplainAiFeedback(null);
+    setExplainSkipped(false);
+    clearExplainRetrySchedule();
   }, [lesson.id, stepIndex]);
 
   useEffect(() => {
     if (result) setFeedbackDismissed(false);
   }, [result]);
 
-  const step = lesson.steps[stepIndex];
+  const step = activeSteps[stepIndex] ?? activeSteps[0];
   const isLearn = step.kind === 'learn' || step.interaction.type === 'info';
   const isExplore = step.kind === 'explore' || isLearn;
-  const isLast = stepIndex === lesson.steps.length - 1;
+  const isLast = stepIndex >= activeSteps.length - 1;
 
   const handleChange = (s: InteractionState) => {
     setIState(s);
-    if (!locked) setResult(null);
+    if (!locked) {
+      if (result || explainRetryWaiting || explainSkipped) {
+        cancelExplainGrading();
+        setExplainSkipped(false);
+      }
+      setResult(null);
+    }
   };
 
-  const handleCheck = () => {
+  const isExplainBack = step.interaction.type === 'explain-back';
+
+  const scheduleExplainRetry = (gen: number) => {
+    clearExplainRetrySchedule();
+    setExplainRetryWaiting(true);
+    explainRetryTimerRef.current = setTimeout(() => {
+      if (gen !== explainGradeGenRef.current) return;
+      void runExplainGrading(gen);
+    }, EXPLAIN_GRADE_RETRY_MS);
+  };
+
+  const runExplainGrading = async (existingGen?: number) => {
+    if (step.interaction.type !== 'explain-back') return false;
+    const explainConfig = step.interaction.config;
+    const text = (iState as ExplainBackState | null)?.text?.trim() ?? '';
+    if (!text) return false;
+
+    const gen = existingGen ?? ++explainGradeGenRef.current;
+    setExplainRetryWaiting(false);
+    setIsGrading(true);
+    setExplainAiFeedback(null);
+
+    const ctx = buildStepContext(step, {
+      learnerState: iState,
+      lessonTitle: lesson.title,
+      lessonConcept: lesson.concept,
+      includeAnswer: false,
+    });
+    const grade = await gradeExplanation(explainConfig, ctx, text);
+
+    if (gen !== explainGradeGenRef.current) return false;
+    setIsGrading(false);
+
+    if (grade) {
+      clearExplainRetrySchedule();
+      setExplainSkipped(false);
+      setExplainAiFeedback(grade.feedback);
+      setResult(grade.result);
+      if (grade.result.correct) {
+        setLocked(true);
+        const firstTry = (sessionWrong[step.id] ?? 0) === 0;
+        store.registerCorrect(lesson, step, firstTry);
+      } else {
+        setSessionWrong((prev) => ({ ...prev, [step.id]: (prev[step.id] ?? 0) + 1 }));
+        store.registerWrong(lesson, step, {
+          outcome: grade.result.outcome,
+          summary: describeInteraction(step, iState, false),
+        });
+      }
+      return true;
+    }
+
+    setResult({ correct: false, outcome: 'grade-unavailable' });
+    scheduleExplainRetry(gen);
+    return false;
+  };
+
+  const handleSkipExplainBack = () => {
+    cancelExplainGrading();
+    setExplainSkipped(true);
+    setLocked(true);
+    setResult(null);
+    setExplainAiFeedback(null);
+    store.registerCorrect(lesson, step, false);
+  };
+
+  const wrongAttemptDetail = (outcome?: string) => ({
+    outcome,
+    summary: describeInteraction(step, iState, false),
+  });
+
+  const fetchWrongNudge = async (r: ValidationResult) => {
+    if (!isAiEnabled || r.correct) return;
+    setWrongNudgeLoading(true);
+    setWrongNudge(null);
+    try {
+      const ctx = buildStepContext(step, {
+        learnerState: iState,
+        result: r,
+        lessonTitle: lesson.title,
+        lessonConcept: lesson.concept,
+        includeAnswer: false,
+      });
+      const nudge = await getWrongAnswerNudge(ctx, step);
+      setWrongNudge(nudge ?? safeAuthoredHint(step));
+    } finally {
+      setWrongNudgeLoading(false);
+    }
+  };
+
+  const handleCheck = async () => {
+    if (step.interaction.type === 'explain-back') {
+      clearExplainRetrySchedule();
+      explainGradeGenRef.current += 1;
+      await runExplainGrading(explainGradeGenRef.current);
+      return;
+    }
+
     const r = validate(step.interaction, step.answer, iState);
+    setHintMessage(null);
+    setWrongNudge(null);
+    setFeedbackDismissed(false);
     setResult(r);
     if (r.correct) {
       setLocked(true);
@@ -171,14 +381,24 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
       store.registerCorrect(lesson, step, firstTry);
     } else {
       setSessionWrong((prev) => ({ ...prev, [step.id]: (prev[step.id] ?? 0) + 1 }));
-      store.registerWrong(lesson, step);
+      store.registerWrong(lesson, step, wrongAttemptDetail(r.outcome));
+      void fetchWrongNudge(r);
     }
+  };
+
+  const handleHint = () => {
+    const authored = safeAuthoredHint(step);
+    if (authored) setHintMessage(authored);
   };
 
   // "Try again": clear the verdict. Selection steps remount to drop the pick and
   // hide the feedback; drag steps keep their shape so the learner can adjust.
   const handleRetry = () => {
+    cancelExplainGrading();
     setResult(null);
+    setExplainAiFeedback(null);
+    setExplainSkipped(false);
+    setWrongNudge(null);
     if (isSelectionStep(step)) {
       setIState(null);
       setAttemptKey((k) => k + 1);
@@ -188,11 +408,16 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
   const goNext = () => {
     if (isLast) {
       store.completeLesson(lesson);
-      setFinished(true);
+      if (isAiEnabled) {
+        setPhase('skillCheck');
+      } else {
+        setFinished(true);
+      }
       return;
     }
     const next = stepIndex + 1;
-    store.setCurrentStep(lesson.id, next);
+    const nextStep = activeSteps[next];
+    if (nextStep) store.setCurrentStep(lesson.id, toFullStepIndex(lesson, nextStep));
     setStepIndex(next);
     setIState(null);
     setResult(null);
@@ -204,22 +429,61 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
     return <CompletionScreen lesson={lesson} />;
   }
 
+  if (phase === 'skillCheck') {
+    return (
+      <div className="fixed inset-y-0 left-1/2 flex w-full max-w-2xl -translate-x-1/2 flex-col overflow-hidden bg-slate-50 lg:max-w-6xl">
+        <div className="pt-safe flex flex-none items-center gap-3 px-4 pb-3">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
+            aria-label="Exit lesson"
+          >
+            ✕
+          </button>
+          <div className="text-sm font-semibold text-slate-600">{lesson.title} · Skill check</div>
+        </div>
+        <SkillCheck lesson={lesson} onComplete={() => setFinished(true)} />
+      </div>
+    );
+  }
+
   // feedback content — explore/learn hints live in the ? icon, not the sticky bar
   let feedback: { tone: FeedbackTone; message: string } | null = null;
   if (result) {
     if (result.correct) {
-      feedback = { tone: 'correct', message: resolveFeedback(step.feedback, result) };
+      const msg =
+        isExplainBack && explainAiFeedback
+          ? explainAiFeedback
+          : resolveFeedback(step.feedback, result);
+      feedback = { tone: 'correct', message: msg };
     } else {
-      const hideHint = suppressWrongHint(step);
-      feedback = {
-        tone: 'wrong',
-        message: hideHint ? genericWrongMessage(step) : resolveFeedback(step.feedback, result),
-      };
+      let message: string;
+      if (isExplainBack && result.outcome === 'grade-unavailable') {
+        message =
+          'AI grading is unavailable — retrying automatically, or skip to see the model answer.';
+      } else if (isExplainBack && explainAiFeedback) {
+        message = explainAiFeedback;
+      } else {
+        message = resolveWrongFeedback(step, result);
+      }
+      feedback = { tone: 'wrong', message };
     }
   }
 
+  const explainGradingBusy = isExplainBack && (isGrading || explainRetryWaiting);
+  const showExplainSkip =
+    isExplainBack && !explainSkipped && !locked && (explainRetryWaiting || result?.outcome === 'grade-unavailable');
+
   const showContinue = isExplore || locked;
   const checkDisabled = !canCheck(step, iState);
+  const showHintButton =
+    !isExplore &&
+    !locked &&
+    !isAiEnabled &&
+    !!safeAuthoredHint(step) &&
+    !(result && !result.correct);
+  const showHintBar = hintMessage && !feedbackDismissed && !feedback;
   const showFeedback = feedback && !feedbackDismissed;
   const conceptHintText =
     step.concept ?? (isExplore && step.feedback.onExplore ? step.feedback.onExplore : undefined);
@@ -236,7 +500,7 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
         >
           ✕
         </button>
-        <StepProgress current={stepIndex} total={lesson.steps.length} />
+        <StepProgress current={stepIndex} total={activeSteps.length} />
       </div>
 
       {/* step body — the only scrollable region */}
@@ -288,8 +552,9 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
                   interaction={step.interaction}
                   answer={step.answer}
                   onChange={handleChange}
-                  disabled={locked}
+                  disabled={locked || explainGradingBusy}
                   result={result}
+                  explainShowSample={explainSkipped}
                 />
               </div>
             </div>
@@ -301,6 +566,17 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
       {/* pinned action area: the button stays in flow; feedback floats above it
           as an overlay so it never changes layout or creates page scroll. */}
       <div className="pb-safe relative flex-none border-t border-slate-100 bg-white px-4 pt-3">
+        {showHintBar && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-full bg-gradient-to-t from-white/40 via-white/15 to-transparent px-4 pb-3 pt-10">
+            <div className="pointer-events-auto">
+              <FeedbackBar
+                tone="info"
+                message={hintMessage}
+                onDismiss={() => setHintMessage(null)}
+              />
+            </div>
+          </div>
+        )}
         {showFeedback && feedback && (
           <div className="pointer-events-none absolute inset-x-0 bottom-full bg-gradient-to-t from-white/40 via-white/15 to-transparent px-4 pb-3 pt-10">
             <div className="pointer-events-auto">
@@ -308,9 +584,20 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
                 tone={feedback.tone}
                 message={feedback.message}
                 onDismiss={() => setFeedbackDismissed(true)}
+                followUp={feedback.tone === 'wrong' ? wrongNudge : undefined}
+                followUpLoading={feedback.tone === 'wrong' && wrongNudgeLoading}
               />
             </div>
           </div>
+        )}
+        {showHintButton && !showContinue && (
+          <button
+            type="button"
+            onClick={handleHint}
+            className="mb-2 w-full rounded-xl border border-sky-200 bg-sky-50 py-2.5 text-sm font-semibold text-sky-800"
+          >
+            Stuck? Get a hint
+          </button>
         )}
         {showContinue ? (
           <button
@@ -320,7 +607,24 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
           >
             {isLast ? 'Finish lesson' : 'Continue'}
           </button>
-        ) : result && !result.correct ? (
+        ) : showExplainSkip ? (
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              disabled
+              className="flex w-full cursor-wait items-center justify-center gap-2 rounded-2xl bg-brand-600 py-4 text-base font-bold text-white opacity-80"
+            >
+              {isGrading ? 'Grading…' : 'Retrying…'}
+            </button>
+            <button
+              type="button"
+              onClick={handleSkipExplainBack}
+              className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 text-base font-semibold text-slate-700"
+            >
+              Skip for now
+            </button>
+          </div>
+        ) : result && !result.correct && result.outcome !== 'grade-unavailable' ? (
           <button
             type="button"
             onClick={handleRetry}
@@ -332,10 +636,10 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
           <button
             type="button"
             onClick={handleCheck}
-            disabled={checkDisabled}
-            className="w-full rounded-2xl bg-brand-600 py-4 text-base font-bold text-white shadow-lg shadow-brand-600/20 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+            disabled={checkDisabled || isGrading}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-600 py-4 text-base font-bold text-white shadow-lg shadow-brand-600/20 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
           >
-            Check
+            {isGrading ? 'Grading…' : 'Check'}
           </button>
         )}
       </div>

@@ -64,6 +64,14 @@ export interface PyramidConfig {
   stagePickerHint?: string;
   /** Explore-only: preset buttons that snap handles to each stage profile. */
   showStagePresets?: boolean;
+  /** Shade youth (0–14) / working (15–64) / elderly (65+) bands over the pyramid. */
+  showBands?: boolean;
+  /** Live readout of approx. dependents per 100 workers as the shape changes. */
+  showDependencyRatio?: boolean;
+  /** Drag nine per-cohort handles (male side) instead of four interpolated controls. */
+  nineHandles?: boolean;
+  /** Nine cohort widths (young → old, 0..1) when nineHandles is set; overrides initialWidths. */
+  initialCohorts?: [number, number, number, number, number, number, number, number, number];
 }
 
 export interface SectorConfig {
@@ -72,6 +80,10 @@ export interface SectorConfig {
   initial?: { primary: number; secondary: number; tertiary: number };
   // classify mode: fixed preset split, learner picks the stage
   preset?: { primary: number; secondary: number; tertiary: number; label?: string };
+  /** adjust mode: show a live implied-stage chip while dragging (only when confidence is high). */
+  showImpliedStage?: boolean;
+  /** adjust mode: show Stage 2/3/4 preset chips that snap the mix. */
+  showStagePresets?: boolean;
 }
 
 export interface PyramidPreset {
@@ -111,6 +123,50 @@ export interface CountryModelConfig {
   // explore-only interaction (no graded answer).
   countryIds: string[];
   initialCountryId?: string;
+  /**
+   * Textbook-vs-actual comparison mode: renders two synced charts side by side
+   * — LEFT = idealized DTM path, RIGHT = the real country data — with the
+   * country picker on top and a single shared year scrubber across both charts.
+   * Defaults to the original single-chart explorer when omitted (backward
+   * compatible). Comparison mode hides the figurine readout and CBR/CDR stats
+   * and draws the total-population line by default.
+   */
+  comparison?: boolean;
+  /** Overlay a scaled total-population line on the chart(s). Defaults on in comparison mode. */
+  showTotalPopulationLine?: boolean;
+  /** Hide the population figurine readout panel. Defaults true in comparison mode. */
+  hideFigurines?: boolean;
+  /** Hide the CBR / CDR / stage numeric readouts. Defaults true in comparison mode. */
+  hideRates?: boolean;
+}
+
+export interface MigrationFlowPreset {
+  id: string;
+  label: string;
+  flag?: string;
+  birthRate: number;
+  deathRate: number;
+}
+
+export interface MigrationFlowConfig {
+  /** Label on the population pool when no country presets are used. */
+  countryLabel?: string;
+  /** Fixed natural increase per 1,000 when countryPresets omitted. */
+  naturalChange: number;
+  /** Selectable countries — NIR derived from birth − death per preset. */
+  countryPresets?: MigrationFlowPreset[];
+  initialPresetId?: string;
+  /** Graded steps: hide country selector and lock NIR. */
+  lockCountry?: boolean;
+  initialIn?: number;
+  initialOut?: number;
+  /** Max migration rate per 1,000 for draggable arrows; default 20. */
+  maxFlow?: number;
+  /** Live trend label in the verdict panel (hide on graded steps). Default true. */
+  showVerdict?: boolean;
+  /** Optional fixed birth/death when countryPresets omitted. */
+  birthRate?: number;
+  deathRate?: number;
 }
 
 export interface CurveDrawConfig {
@@ -121,6 +177,14 @@ export interface CurveDrawConfig {
   // Non-draggable curves drawn faintly for context (e.g. show the death curve
   // already built while the learner draws the birth curve).
   referenceCurves?: { birth?: number[]; death?: number[] };
+  /**
+   * Relabel the x-axis. By default the five points read as DTM stages (1..5).
+   * Provide `xTicks` (five labels mapped left→right onto the points) and `xLabel`
+   * to repurpose the same chart for a TIME axis — e.g. drawing how fast a real
+   * country's transition happened (decades vs centuries). Geometry is unchanged.
+   */
+  xLabel?: string;
+  xTicks?: (string | number)[];
 }
 
 export interface StageSelectConfig {
@@ -146,6 +210,171 @@ export interface InfoConfig {
   terms?: InfoRateTerm[];
 }
 
+export interface ThreeLensConfig {
+  // The stage these panels jointly depict (drives the rate snapshot highlight).
+  stage: number;
+  sectors: { primary: number; secondary: number; tertiary: number };
+  pyramid: PyramidPreset;
+  rateLabel?: string; // e.g. "Low births, low deaths"
+  /** Show the birth/death rate panel. Default true; set false to hide it (e.g.
+   *  so the rate curve doesn't give away the answer — only pyramid + sectors). */
+  showRates?: boolean;
+}
+
+export interface MatchTile {
+  id: string;
+  label: string;
+  image?: string; // served path, e.g. "/img/farm.png"
+  icon?: string; // emoji fallback when no image
+  /** Render a population-pyramid anomaly thumbnail (no text label when hideLabel is set). */
+  anomalyId?: string;
+  hideLabel?: boolean;
+}
+
+export interface MatchSlot {
+  id: string;
+  label: string; // e.g. "Maria's grandparents"
+  sublabel?: string;
+  image?: string;
+  icon?: string;
+}
+
+export interface CategoryBarsConfig {
+  /** explore: development handle drives mix. adjust: learner drags each card vertically. */
+  mode?: 'explore' | 'adjust';
+  /** Development position on 1..5 axis; defaults to 1 (least developed). Explore only. */
+  initialDev?: number;
+  /** Population used for estimated death counts; default 10,000,000. Explore only. */
+  population?: number;
+  /** Display label for population, e.g. "10 million". */
+  populationLabel?: string;
+  /** Starting figurine count per bucket (adjust mode). */
+  initialFigures?: { infectious: number; famine: number; accidents: number; chronic: number };
+  /** Max figurines per bucket in adjust mode; default 7. */
+  maxFigures?: number;
+}
+
+export interface MatchPairsConfig {
+  // Fixed targets shown in order (e.g. the three people). The learner drags a
+  // tile (e.g. a job/sector) into the drop zone beneath each slot.
+  slots: MatchSlot[];
+  // Draggable tiles (e.g. farm / factory / office).
+  tiles: MatchTile[];
+  instruction?: string; // small helper line under the prompt
+  /** Bucket/sort mode: a slot can hold multiple tiles (e.g. 4 tiles into 2 buckets). */
+  multiPerSlot?: boolean;
+  /**
+   * Multi-category mode: a single tile can be placed into MULTIPLE slots at once
+   * (e.g. a scenario that is both a "push factor" AND "forced migration"). Tiles
+   * stay available in the tray so they can be dropped into several categories.
+   * Grade with `MatchPairsAnswer.tileSlots` (exact set per tile).
+   */
+  multiPerTile?: boolean;
+  /**
+   * multiPerTile only: cap how many categories a single tile can occupy (e.g. 2 for
+   * "one direction + one choice"). Drops past the cap are ignored, and Check stays
+   * disabled until every tile is placed in exactly this many slots.
+   */
+  maxPerTile?: number;
+}
+
+export interface FamilySizeConfig {
+  /** explore: development handle drives average family size. adjust: learner drags up/down. */
+  mode?: 'explore' | 'adjust';
+  /** Development position on 1..5 axis; defaults to 1 (least developed). Explore only. */
+  initialDev?: number;
+  /** Starting children count (adjust mode); defaults to 4. */
+  initialChildren?: number;
+  /** Max children the learner can set in adjust mode; default 8. */
+  maxChildren?: number;
+}
+
+export interface ExplainBackConfig {
+  question: string;
+  /** Key points a full-credit answer must touch (grounds the AI grader). */
+  rubric: string[];
+  /** Model answer shown on reveal / when AI is off. */
+  sampleAnswer: string;
+  placeholder?: string;
+  minChars?: number;
+}
+
+export interface PyramidPickOption {
+  stage: number;   // which STAGE_PYRAMID_PROFILES shape to render (1..5)
+  label?: string;  // defaults to `Stage ${stage}` in the component
+}
+export interface PyramidPickConfig {
+  options: PyramidPickOption[];
+  multi?: boolean; // allow selecting multiple options (default false)
+}
+
+export interface ChartPickSeriesPoint {
+  year: number;
+  birth: number; // crude birth rate (per 1,000)
+  death: number; // crude death rate (per 1,000)
+  pop: number; // total population (millions) — drives the secondary-axis pop line
+}
+export interface ChartPickOption {
+  id: string;
+  caption?: string; // short label shown under the mini chart
+  series: ChartPickSeriesPoint[]; // small birth/death rate chart (small multiple)
+}
+export interface ChartPickConfig {
+  instruction?: string; // small helper line under the prompt
+  options: ChartPickOption[];
+  showCaptions?: boolean; // show per-option captions (default true)
+  /**
+   * Overlay a scaled total-population line (violet) on each mini chart, like
+   * CountryModel's comparison mode. Each card scales pop to its OWN secondary
+   * axis so the line is readable next to the shared 0–55 rate axis. Default ON.
+   */
+  showTotalPopulationLine?: boolean;
+}
+
+export interface AnomalyPyramidShape {
+  id: string;
+  label: string;
+  /** Nine cohort widths (youngest → oldest), each 0..1 — symmetric fallback when sex-specific arrays omitted. */
+  cohorts: [number, number, number, number, number, number, number, number, number];
+  /** Optional male-side widths per cohort (left bars). */
+  maleCohorts?: [number, number, number, number, number, number, number, number, number];
+  /** Optional female-side widths per cohort (right bars). */
+  femaleCohorts?: [number, number, number, number, number, number, number, number, number];
+  caption: string;
+}
+
+export interface AnomalyPyramidConfig {
+  shapes: AnomalyPyramidShape[];
+  /** Gallery mode: learner can switch between shapes. */
+  selectable?: boolean;
+  /** Which shape to show initially (reference / static mode). */
+  initialShapeId?: string;
+  /** view = read-only; adjust = drag nine cohort handles on the male side. */
+  mode?: 'view' | 'adjust';
+  /** Show caption text under selectors (default true). */
+  showCaption?: boolean;
+}
+
+export interface WorldMapConfig {
+  /** Country ids from worldCountries.ts to show as map markers. */
+  countryIds: string[];
+  /** explore = data card; pick = single-select; pick-multi = select exact set. */
+  mode?: 'explore' | 'pick' | 'pick-multi';
+  /** Reference mode: ring + static card for this country. */
+  highlightId?: string;
+  /** Pan/zoom the map so this country sits near the center on load. */
+  centerOnId?: string;
+  /** Show full rates/pyramid card on tap (default true in explore, false in pick). */
+  showDataCard?: boolean;
+  /** Hide the mini pyramid on the data card (rates-only reference). */
+  hidePyramidMini?: boolean;
+  /** Hide the country blurb under the rates grid. */
+  hideBlurb?: boolean;
+  /** Hide stage-colored pins (use neutral markers) — default true for pick modes. */
+  hideStageColors?: boolean;
+  caption?: string;
+}
+
 export type Interaction =
   | { type: 'rate-graph'; config: RateGraphConfig }
   | { type: 'country-model'; config: CountryModelConfig }
@@ -156,8 +385,17 @@ export type Interaction =
   | { type: 'sector-bars'; config: SectorConfig }
   | { type: 'multiple-choice'; config: McConfig }
   | { type: 'nir-slider'; config: NirSliderConfig }
-  | { type: 'rate-sliders'; config: RateSlidersConfig };
-// future: | { type: 'world-map'; config: WorldMapConfig }
+  | { type: 'rate-sliders'; config: RateSlidersConfig }
+  | { type: 'three-lens'; config: ThreeLensConfig }
+  | { type: 'match-pairs'; config: MatchPairsConfig }
+  | { type: 'pyramid-pick'; config: PyramidPickConfig }
+  | { type: 'chart-pick'; config: ChartPickConfig }
+  | { type: 'category-bars'; config: CategoryBarsConfig }
+  | { type: 'family-size'; config: FamilySizeConfig }
+  | { type: 'anomaly-pyramid'; config: AnomalyPyramidConfig }
+  | { type: 'migration-flow'; config: MigrationFlowConfig }
+  | { type: 'explain-back'; config: ExplainBackConfig }
+  | { type: 'world-map'; config: WorldMapConfig };
 
 export type InteractionType = Interaction['type'];
 
@@ -173,13 +411,16 @@ export interface RateGraphAnswer {
 }
 export interface PyramidAnswer {
   stages: number[]; // accepted DTM stage(s) for the shape/preset
-  /** Ideal control widths for per-handle feedback (does not change stage grading). */
+  /** Ideal four control widths for per-handle feedback (four-handle mode). */
   targetWidths?: [number, number, number, number];
+  /** Ideal nine cohort widths for per-handle feedback (nine-handle mode). */
+  targetCohorts?: [number, number, number, number, number, number, number, number, number];
   tolerance?: number; // per-control tolerance, default 0.12
 }
 export interface SectorAnswer {
   dominant?: Sector; // the sector that must dominate
   stages?: number[]; // or an accepted stage classification
+  minTertiary?: number; // adjust mode: require tertiary >= this value (tightened Stage 4 solve)
 }
 export interface McAnswer {
   correctId: string;
@@ -204,6 +445,52 @@ export interface CurveDrawAnswer {
 export interface StageSelectAnswer {
   stages: number[]; // accepted DTM stage(s)
 }
+export interface MatchPairsAnswer {
+  // Correct slot id for each tile id, e.g. { farm: 'grandparents', ... }.
+  // One tile -> one slot (single-match and bucket modes).
+  pairs?: Record<string, string>;
+  // Multi-category mode (multiPerTile): the exact SET of correct slots per tile,
+  // e.g. { 'forced-war': ['push', 'forced'] }. A tile is correct only when its
+  // placements equal this set exactly (no missing and no extra slots).
+  tileSlots?: Record<string, string[]>;
+}
+export interface PyramidPickAnswer {
+  stages: number[]; // accepted stage(s); for multi, the full correct set
+}
+export interface ChartPickAnswer {
+  correctId: string; // id of the chart option that matches the scenario
+}
+
+export type CauseKey = 'infectious' | 'famine' | 'accidents' | 'chronic';
+
+export interface CategoryBarsAnswer {
+  minFigures?: Partial<Record<CauseKey, number>>;
+  maxFigures?: Partial<Record<CauseKey, number>>;
+}
+
+export interface FamilySizeAnswer {
+  minChildren?: number;
+  maxChildren?: number;
+}
+
+export interface AnomalyPyramidAnswer {
+  maleCohorts: [number, number, number, number, number, number, number, number, number];
+  femaleCohorts: [number, number, number, number, number, number, number, number, number];
+  tolerance?: number;
+}
+
+export interface MigrationFlowAnswer {
+  trend?: Trend;
+  minNet?: number;
+  maxNet?: number;
+}
+
+export interface WorldMapAnswer {
+  /** Single pick: accepted id(s). Multi pick: exact set required (all must match). */
+  countryIds?: string[];
+  /** Single pick only: correct when tapped country's stage is in this list. */
+  stages?: number[];
+}
 
 export type Answer =
   | RateGraphAnswer
@@ -213,7 +500,15 @@ export type Answer =
   | NirSliderAnswer
   | RateSlidersAnswer
   | CurveDrawAnswer
-  | StageSelectAnswer;
+  | StageSelectAnswer
+  | MatchPairsAnswer
+  | PyramidPickAnswer
+  | ChartPickAnswer
+  | CategoryBarsAnswer
+  | FamilySizeAnswer
+  | AnomalyPyramidAnswer
+  | MigrationFlowAnswer
+  | WorldMapAnswer;
 
 // ---------------------------------------------------------------------------
 // Validation + feedback (outcome-based)

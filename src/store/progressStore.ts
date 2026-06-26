@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Lesson, Step } from '../types/content';
-import type { UserData, UserProfile, LessonProgress } from '../types/progress';
+import type { UserData, UserProfile, LessonProgress, StepAttemptNote } from '../types/progress';
 import {
   loadUserData,
   persistProgress,
@@ -24,7 +24,11 @@ interface ProgressState {
   ensureLessonStarted: (lesson: Lesson) => void;
   reopenLessonIfComplete: (lesson: Lesson) => void;
   setCurrentStep: (lessonId: string, index: number) => void;
-  registerWrong: (lesson: Lesson, step: Step) => void;
+  registerWrong: (
+    lesson: Lesson,
+    step: Step,
+    detail?: { outcome?: string; summary?: string },
+  ) => void;
   registerCorrect: (lesson: Lesson, step: Step, isFirstTry?: boolean) => void;
   completeLesson: (lesson: Lesson) => void;
 }
@@ -128,12 +132,24 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     void persistProgress(data.profile, lp);
   },
 
-  registerWrong: (lesson, step) => {
+  registerWrong: (lesson, step, detail) => {
     const data = get().data;
     if (!data) return;
     const existing = data.progress[lesson.id] ?? emptyLessonProgress(lesson.id);
     const attempts = { ...existing.attempts, [step.id]: (existing.attempts[step.id] ?? 0) + 1 };
-    const lp: LessonProgress = { ...existing, playState: 'in_progress', attempts, updatedAt: Date.now() };
+    const note: StepAttemptNote = {
+      ...(existing.attemptNotes?.[step.id] ?? {}),
+      ...(detail?.outcome ? { lastOutcome: detail.outcome } : {}),
+      ...(detail?.summary ? { lastWrongSummary: detail.summary } : {}),
+    };
+    const attemptNotes = { ...existing.attemptNotes, [step.id]: note };
+    const lp: LessonProgress = {
+      ...existing,
+      playState: 'in_progress',
+      attempts,
+      attemptNotes,
+      updatedAt: Date.now(),
+    };
 
     let next: UserData = { ...data, progress: { ...data.progress, [lesson.id]: lp } };
     if (step.concepts?.length) {

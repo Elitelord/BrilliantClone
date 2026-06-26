@@ -12,6 +12,30 @@ export const sectorShift: Lesson = {
   prerequisites: ['population-pyramids'],
   steps: [
     {
+      id: 'learn-sectors',
+      kind: 'learn',
+      prompt: 'Every job sits in one of three sectors.',
+      concept:
+        'Geographers split all work into three sectors. Primary takes raw materials from the earth, secondary turns them into goods, and tertiary provides services for people.',
+      concepts: ['sector-shift'],
+      interaction: {
+        type: 'info',
+        config: {
+          icon: '🏭',
+          body:
+            'Geographers sort every job into one of three sectors, based on what kind of work it is.',
+          points: [
+            'Primary: take raw materials from the earth — farming, fishing, mining',
+            'Secondary: turn those raw materials into goods — factories, construction',
+            'Tertiary: provide services for people — shops, hospitals, schools, offices',
+          ],
+        },
+      },
+      feedback: {
+        onExplore: 'Next: drag the bars to see how the mix shifts as a country develops.',
+      },
+    },
+    {
       id: 'explore-sectors',
       kind: 'explore',
       prompt:
@@ -22,16 +46,46 @@ export const sectorShift: Lesson = {
       difficulty: 1,
       interaction: {
         type: 'sector-bars',
-        config: { mode: 'adjust', initial: { primary: 70, secondary: 20, tertiary: 10 } },
+        config: {
+          mode: 'adjust',
+          initial: { primary: 70, secondary: 20, tertiary: 10 },
+          showImpliedStage: true,
+          showStagePresets: true,
+        },
       },
       feedback: {
-        onExplore: 'Poor, early-stage countries are mostly farming. Rich, late-stage countries are mostly services.',
+        onExplore:
+          'Early on, almost everyone farms. Mid-development, factories grow. Late stage, machines do the farming and building — so most people serve, teach, heal, and code.',
+      },
+    },
+    {
+      id: 'learn-why-shift',
+      kind: 'learn',
+      prompt: 'Why do the sectors shift in this order?',
+      concept:
+        'The same forces that drive the DTM drive the sector shift. As farming mechanizes, freed-up workers move to cities and factories; rising incomes then demand services and draw more women into paid work, which helps births fall in Stage 3.',
+      concepts: ['sector-shift', 'dtm-stages'],
+      interaction: {
+        type: 'info',
+        config: {
+          icon: '⚙️',
+          body:
+            'The introduction of farm machines reduced labor requirements for food production. Therefore, those workers move to cities, which also causes urbanization and increases the demand for services. At the same time, more women enter the paid workforce, leading to smaller families and lower birth rates.',
+          points: [
+            'Machines free farm labor → people move to cities',
+            'Factories grow, then services follow as incomes rise',
+            'More women in paid work → smaller families → births fall (Stage 3)',
+          ],
+        },
+      },
+      feedback: {
+        onExplore: 'Next: predict which sector dominates an early-stage country.',
       },
     },
     {
       id: 'predict-stage2-sector',
       kind: 'predict',
-      prompt: 'In an early-stage (Stage 2) country, most people work in which sector?',
+      prompt: 'In a Stage 1/2 country, most people work in which sector?',
       concept: 'Before machines and offices, almost everyone must grow food - so early economies are dominated by farming (the primary sector).',
       concepts: ['sector-shift'],
       difficulty: 1,
@@ -56,33 +110,143 @@ export const sectorShift: Lesson = {
       },
     },
     {
+      id: 'solve-stage3-sector',
+      kind: 'solve',
+      prompt: 'Drag the mix to match a Stage 3 country.',
+      concepts: ['sector-shift', 'dtm-stages'],
+      difficulty: 2,
+      interaction: {
+        type: 'sector-bars',
+        config: { mode: 'adjust', initial: { primary: 65, secondary: 20, tertiary: 15 } },
+      },
+      answer: { dominant: 'secondary' },
+      feedback: {
+        correct: 'Yes — in a Stage 3 country, factories employ the biggest share due to industrialization.',
+        byOutcome: {
+          primary: 'That\'s more closely aligned with a Stage 2 country (farming-led). ',
+          tertiary: 'That\'s more closely aligned with a Stage 4 country (services-led).',
+        },
+        hint: 'Make the industry (secondary) bar the tallest.',
+      },
+    },
+    {
       id: 'solve-stage4-sector',
       kind: 'solve',
-      prompt: 'Drag the mix to match a developed Stage 4 economy, where services dominate.',
-      concept: 'In rich economies, machines do the farming and much of the manufacturing, so most people work in services - the tertiary sector leads.',
+      prompt: 'Drag the mix to match a Stage 4 country.',
       concepts: ['sector-shift', 'dtm-stages'],
       difficulty: 2,
       interaction: {
         type: 'sector-bars',
         config: { mode: 'adjust', initial: { primary: 60, secondary: 25, tertiary: 15 } },
       },
-      answer: { dominant: 'tertiary' },
+      answer: { dominant: 'tertiary', minTertiary: 55 },
       feedback: {
-        correct: 'Yes - in a developed economy, services are the biggest slice by far.',
+        correct: 'Yes - in a Stage 4 country, services are the biggest slice by far.',
         byOutcome: {
-          primary: 'That is still a farming economy (early stage). Make services the biggest slice.',
-          secondary: 'That is an industrializing economy (Stage 3). Push services higher than industry.',
+          primary: 'That\'s more closely aligned with a Stage 2 country (farming-led). ',
+          secondary: 'That\'s more closely aligned with a Stage 3 country (industry-led).',
+          'tertiary-low': 'Services are usually the largest sector in a Stage 4 country.',
         },
-        hint: 'Make the services (tertiary) bar the tallest.',
+        hint: 'Make services (tertiary) clearly the tallest — over half of all jobs.',
+      },
+    },
+    {
+      id: 'connect-generations',
+      kind: 'connect',
+      prompt:
+        'Maria\'s family tells the whole story in three generations. Drag each job under the person who did it.',
+      concept:
+        'One family across three generations can trace the whole transition: primary -> secondary -> tertiary.',
+      concepts: ['sector-shift', 'sector-stage-link'],
+      difficulty: 2,
+      interaction: {
+        type: 'match-pairs',
+        config: {
+          tiles: [
+            { id: 'farm', label: 'Farming', image: '/img/farm.png' },
+            { id: 'factory', label: 'Factory', image: '/img/factory.png' },
+            { id: 'office', label: 'Office', image: '/img/office.png' },
+          ],
+          slots: [
+            { id: 'grandparents', label: 'Maria\'s grandparents', sublabel: 'oldest generation', image: '/img/grandparents.png' },
+            { id: 'parents', label: 'Maria\'s parents', sublabel: 'middle generation', image: '/img/parents.png' },
+            { id: 'maria', label: 'Maria', sublabel: 'youngest generation', image: '/img/maria.png' },
+          ],
+        },
+      },
+      answer: {
+        pairs: { farm: 'grandparents', factory: 'parents', office: 'maria' },
+      },
+      feedback: {
+        correct: 'Exactly - the family would move from farming to industry to services: covering the 3 sectors.',
+        incorrect: 'Not quite. Remember how the sectors shift as a country develops.',
+        hint: 'The oldest generation started where development begins (farming).',
       },
     },
     {
       id: 'connect-sector-stage',
       kind: 'connect',
-      prompt: 'A country\'s jobs are mostly services, and its births and deaths are both low. Which DTM stage is it in?',
-      concept: 'A service-based economy with low births and deaths is a developed, stable country - Stage 4. The three lenses (rates, pyramid, jobs) all agree.',
+      prompt:
+        'This country\'s jobs are mostly services. Which population pyramids could belong to it? Select every shape that fits.',
       concepts: ['sector-stage-link', 'dtm-stages'],
       difficulty: 2,
+      reference: {
+        type: 'sector-bars',
+        config: { mode: 'adjust', initial: { primary: 8, secondary: 20, tertiary: 72 } },
+      },
+      interaction: {
+        type: 'pyramid-pick',
+        config: {
+          multi: true,
+          options: [{ stage: 2 }, { stage: 3 }, { stage: 4 }, { stage: 5 }],
+        },
+      },
+      answer: { stages: [4, 5] },
+      feedback: {
+        correct:
+          'Right — a service economy is developed, so its pyramid is a Stage 4 column or a Stage 5 aging shape: both with low births and deaths.',
+        incorrect:
+          'Not quite — a service-led economy is developed. Pick the narrow-base shapes (low births), not the wide-base early stages.',
+        hint: 'Services dominate only after births fall. Which pyramids have narrow bases?',
+      },
+    },
+    {
+      id: 'classify-usa',
+      kind: 'solve',
+      prompt: 'Here is the United States\' job mix today. Which DTM stage does it suggest?',
+      concepts: ['sector-stage-link', 'dtm-stages'],
+      difficulty: 2,
+      interaction: {
+        type: 'sector-bars',
+        config: { mode: 'classify', preset: { primary: 3, secondary: 22, tertiary: 75, label: 'United States' } },
+      },
+      answer: { stages: [4, 5] },
+      feedback: {
+        correct: 'Correct, this split can suggest Stage 4 or 5. Although jobs alone can\'t tell Stage 4 from 5, the pyramid and birth rate do (the US is actually Stage 4).',
+        byOutcome: {
+          'stage-1': 'Stage 1 is a pre-industrial economy.',
+          'stage-2': 'Stage 2 is a farming economy.',
+          'stage-3': 'Stage 3 has lots of industry.',
+        },
+        hint: 'Which sector is overwhelmingly the largest?',
+      },
+    },
+    {
+      id: 'capstone-three-lens',
+      kind: 'connect',
+      prompt:
+        'Which stage do these two lenses point to?',
+      concepts: ['sector-stage-link', 'dtm-stages'],
+      difficulty: 3,
+      reference: {
+        type: 'three-lens',
+        config: {
+          stage: 3,
+          showRates: false,
+          sectors: { primary: 25, secondary: 45, tertiary: 30 },
+          pyramid: { widths: [0.56, 0.52, 0.44, 0.36] },
+        },
+      },
       interaction: {
         type: 'multiple-choice',
         config: {
@@ -93,64 +257,14 @@ export const sectorShift: Lesson = {
           ],
         },
       },
-      answer: { correctId: 'stage4' },
+      answer: { correctId: 'stage3' },
       feedback: {
-        correct: 'Right - service jobs plus low births and deaths all point to a developed Stage 4.',
+        correct: 'Exactly — industry leads the jobs and the pyramid is still narrowing: a country mid-development, Stage 3.',
         byOutcome: {
-          stage2: 'Stage 2 is a farming economy with high births. This one is services with low births.',
-          stage3: 'Stage 3 is still industrializing with falling births. This is further along - mostly services.',
+          stage2: 'Stage 2 is farming-led with a wide-base pyramid.',
+          stage4: 'Stage 4 is services-led with a column pyramid.',
         },
-        hint: 'Services + low-low rates = the developed, stable stage.',
-      },
-    },
-    {
-      id: 'connect-generations',
-      kind: 'connect',
-      prompt:
-        'Maria\'s grandparents were farmers, her parents worked in a factory, and Maria writes software. Her family\'s story mirrors a country moving through which order of sectors?',
-      concept:
-        'One family across three generations can trace the whole transition: primary -> secondary -> tertiary. The development story is personal, not just national.',
-      concepts: ['sector-shift', 'sector-stage-link'],
-      difficulty: 2,
-      interaction: {
-        type: 'multiple-choice',
-        config: {
-          options: [
-            { id: 'p-s-t', label: 'Farming -> Industry -> Services' },
-            { id: 't-s-p', label: 'Services -> Industry -> Farming' },
-            { id: 's-p-t', label: 'Industry -> Farming -> Services' },
-          ],
-        },
-      },
-      answer: { correctId: 'p-s-t' },
-      feedback: {
-        correct: 'Exactly - farming, then factory, then services: the transition in one family.',
-        byOutcome: {
-          't-s-p': 'That is backwards - development moves TOWARD services, not away from them.',
-          's-p-t': 'Not quite - farming comes first, before industry, not after.',
-        },
-        hint: 'Grandparents (oldest) started where development begins.',
-      },
-    },
-    {
-      id: 'classify-service-economy',
-      kind: 'solve',
-      prompt: 'Here is a country\'s job mix today: mostly services. Which DTM stage does it suggest?',
-      concept: 'A heavily service-based economy is a sign of an advanced, developed country - Stage 4 (or beyond).',
-      concepts: ['sector-stage-link', 'dtm-stages'],
-      difficulty: 2,
-      interaction: {
-        type: 'sector-bars',
-        config: { mode: 'classify', preset: { primary: 3, secondary: 22, tertiary: 75, label: 'Country X' } },
-      },
-      answer: { stages: [4] },
-      feedback: {
-        correct: 'Right - an economy this service-heavy is developed: Stage 4.',
-        byOutcome: {
-          'stage-2': 'Stage 2 is a FARMING economy. This one is almost all services.',
-          'stage-3': 'Stage 3 has lots of industry. Here services dwarf industry - it is further along.',
-        },
-        hint: 'Which sector is overwhelmingly the largest?',
+        hint: 'Which sector is tallest — and is the pyramid still narrowing or already a column?',
       },
     },
   ],

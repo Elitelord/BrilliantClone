@@ -219,4 +219,23 @@ describe('updateMasteryForConcepts', () => {
     expect(next['natural-increase'].strength).toBeCloseTo(0.3);
     expect(next['natural-increase'].wrongCount).toBe(2);
   });
+
+  it('omits nextDue when not previously set', () => {
+    const next = updateMasteryForConcepts({}, ['migration'], false);
+    expect(next.migration).not.toHaveProperty('nextDue');
+  });
+
+  it('preserves nextDue when previously set', () => {
+    const prev = {
+      migration: {
+        conceptId: 'migration',
+        strength: 0.5,
+        lastSeen: 1,
+        wrongCount: 0,
+        nextDue: 1_700_000_000_000,
+      },
+    };
+    const next = updateMasteryForConcepts(prev, ['migration'], true);
+    expect(next.migration.nextDue).toBe(1_700_000_000_000);
+  });
 });

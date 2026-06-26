@@ -2,6 +2,8 @@
 
 > **Live app:** https://brilliantclone-b4a2a.web.app
 
+> **Demo account (for reviewers):** `demo@brilliantclone.app` / `PopulationPathDemo1!` — sign in on the login page; no signup required.
+
 > **Subject:** AP Human Geography — the **Demographic Transition Model (DTM)**, taught Brilliant-style: no videos, no AI, just interactive problems with instant feedback. Built for a 14–15 year old studying for the AP exam (and the curious).
 
 This is the **Phase 1 MVP**: a deployed, mobile-first, learn-by-doing web app with three interactive lessons that build on each other, auth, persistent progress, a mastery-gated course path, and a daily streak. It teaches the DTM with **zero AI** (per the project brief's hard rule for Phase 1).
@@ -102,4 +104,28 @@ Make sure `.firebaserc` points to your project ID (`firebase projects:list` to c
 
 In scope (Phase 1): 3 interactive lessons, instant hand-written feedback, progress + resume, course path with mastery and next-step recommendation, streaks, auth, mobile, deploy.
 
-Out of scope (later phases): all AI features, full spaced-repetition/learning-science layer, the world-map "Place the Country" lesson, population-pyramid anomalies lesson, leagues/XP. See `prd.md` for the full breakdown.
+Out of scope (later phases): full spaced-repetition/learning-science layer (Phase 3), the world-map "Place the Country" lesson, population-pyramid anomalies lesson, leagues/XP. See `prd.md` and `PHASE2-AI-NOTES.md`.
+
+## Phase 2: AI features (optional, additive)
+
+Set `VITE_AI_ENABLED=true` in `.env`. The app teaches fully with AI off.
+
+### Choosing a provider (`VITE_AI_PROVIDER`)
+
+| Provider | When to use | What to set |
+|----------|-------------|-------------|
+| `firebase` (default) | Already on Firebase; `firebase init ailogic` done | Firebase config + App Check for prod |
+| `openai` | Boss gives an **OpenAI API key** | `VITE_AI_PROVIDER=openai` + `VITE_OPENAI_API_KEY=...` |
+| `gemini-api` | Boss gives a **Google AI Studio / Gemini API key** | `VITE_GEMINI_API_KEY=...` |
+| `proxy` | Boss gives a **backend URL** (keys stay on server) | `VITE_AI_PROXY_URL=...` (+ optional token) |
+
+All feature code calls `generateText` / `generateJson` — only the provider layer changes. Proxy contract: `src/lib/ai/provider/proxyProvider.ts`.
+
+When enabled:
+- **Wrong-answer nudge** after a wrong check (tailored, no-giveaway guard)
+- **Explain it back** — AI-graded free response at end of lesson (**skipped entirely when AI is off**)
+- **3-question skill check** after each lesson
+
+Optional: `VITE_AI_MODEL=gemini-2.5-flash-lite` for lower cost on paid plans.
+
+Debug in browser console: import `{ aiIntegrationStatus } from './lib/ai'` or check network tab for provider used.

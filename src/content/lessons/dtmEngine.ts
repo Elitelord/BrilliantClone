@@ -83,8 +83,6 @@ export const dtmEngine: Lesson = {
       kind: 'predict',
       prompt:
         'Death rates have fallen sharply while birth rates stay high. Set the natural increase rate you would expect.',
-      concept:
-        'When deaths fall but births stay high, NIR widens and the population grows rapidly. This is what set off the global population boom.',
       concepts: ['natural-increase'],
       difficulty: 1,
       reference: {
@@ -99,11 +97,11 @@ export const dtmEngine: Lesson = {
       feedback: {
         correct: 'Correct. Deaths fall, births stay high, and the widening gap drives rapid growth — the Early Expanding stage.',
         byOutcome: {
-          stable: 'That gap is too small — deaths have dropped but births are still very high in Stage 2.',
-          growing: 'Close, but the gap is even wider than that in Stage 2.',
-          shrinking: 'The opposite: births still far outnumber deaths in Stage 2, so the population grows quickly.',
+          stable: 'That gap is too small.',
+          growing: 'Close.',
+          shrinking: 'Not quite.',
         },
-        hint: 'Set a wide positive NIR — births should far outpace deaths.',
+        hint: 'Deaths just fell — how does that change the gap if births stay high?',
       },
     },
     {
@@ -111,8 +109,6 @@ export const dtmEngine: Lesson = {
       kind: 'predict',
       prompt:
         'On the England tab you saw its death rate fall fast around 1800 while births stayed high. Tap the stage England was entering.',
-      concept:
-        'Falling deaths with still-high births is the signature of Stage 2 — and England\'s population surged through the 1800s for exactly this reason.',
       concepts: ['dtm-history', 'dtm-stages'],
       difficulty: 2,
       interaction: { type: 'stage-select', config: {} },
@@ -132,8 +128,6 @@ export const dtmEngine: Lesson = {
       id: 'solve-stable',
       kind: 'solve',
       prompt: 'Drag the handle to a stage where the population is stable — barely growing or shrinking.',
-      concept:
-        'There are two stable points: Stage 1, where high births and high deaths cancel out, and Stage 4, where both are low. In each, NIR is close to zero.',
       concepts: ['natural-increase', 'dtm-stages'],
       difficulty: 2,
       interaction: {
@@ -146,7 +140,7 @@ export const dtmEngine: Lesson = {
         byOutcome: {
           'rapid-growth': 'The gap between the lines is still too wide here.',
           growing: 'There is still a clear gap between the two lines.',
-          shrinking: 'Population is declining here — look for where the lines almost touch.',
+          shrinking: 'Population is declining here.',
         },
       },
     },
@@ -154,8 +148,6 @@ export const dtmEngine: Lesson = {
       id: 'connect-decline',
       kind: 'connect',
       prompt: 'Drag to the stage where deaths outnumber births and the population declines.',
-      concept:
-        'In Stage 5 the birth rate falls below the death rate. NIR turns negative and the population shrinks — as in Japan today.',
       concepts: ['dtm-stages'],
       difficulty: 2,
       interaction: {
@@ -166,7 +158,7 @@ export const dtmEngine: Lesson = {
       feedback: {
         correct: 'Correct — in Stage 5 the death line rises above the birth line, so NIR is negative and population falls.',
         byOutcome: {
-          stable: 'The lines are too close together — keep going until deaths clearly exceed births.',
+          stable: 'The lines are too close together.',
           growing: 'Births still outnumber deaths here.',
           'rapid-growth': 'That is rapid growth, not decline.',
         },
@@ -177,8 +169,6 @@ export const dtmEngine: Lesson = {
       kind: 'connect',
       prompt:
         'Today, Japan and Italy record more deaths than births each year. Tap the stage they are in.',
-      concept:
-        'Below-replacement birth rates push a country into Stage 5: a shrinking, aging population. It is the newest stage of the model.',
       concepts: ['dtm-stages'],
       difficulty: 2,
       interaction: { type: 'stage-select', config: {} },
@@ -197,8 +187,6 @@ export const dtmEngine: Lesson = {
       id: 'build-death',
       kind: 'solve',
       prompt: 'Build the model yourself — start with the death rate. Drag each point to show how deaths change across the stages.',
-      concept:
-        'Death rates start high, then fall sharply in Stage 2 as food, clean water, and medicine improve, before leveling off at a low rate.',
       concepts: ['dtm-stages'],
       difficulty: 3,
       interaction: {
@@ -214,8 +202,6 @@ export const dtmEngine: Lesson = {
       id: 'build-birth',
       kind: 'solve',
       prompt: 'Now add the birth rate (your death curve is shown faded). Drag to show how births change across the stages.',
-      concept:
-        'Births stay high through Stage 2 and only fall in Stage 3, as families urbanize and women gain education — finally dipping clearly below deaths in Stage 5. The gap between the curves is the engine of population change.',
       concepts: ['natural-increase', 'dtm-stages'],
       difficulty: 3,
       interaction: {
@@ -230,10 +216,36 @@ export const dtmEngine: Lesson = {
       feedback: {
         correct: 'That is the model. Births stay high while deaths fall, then drop in Stage 3 — and the gap drives the population.',
         byOutcome: {
-          'birth-early': 'Birth rates stay high longer than that. Keep them high through Stage 2, then drop them in Stage 3.',
-          off: 'Close — births start high (~40), hold through Stage 2, fall to about 12 by Stage 4, and dip below deaths in Stage 5.',
+          'birth-early': 'Birth rates stay high longer than that.',
+          off: 'Close.',
         },
-        hint: 'Births stay high through Stage 2, fall in Stage 3, and end just below the death curve in Stage 5.',
+        hint: 'Start high, then trace how births change across all five stages.',
+      },
+    },
+    {
+      id: 'explain-stage2-boom',
+      kind: 'connect',
+      prompt: 'In your own words, why does population explode in Stage 2?',
+      concepts: ['natural-increase', 'dtm-stages'],
+      difficulty: 2,
+      interaction: {
+        type: 'explain-back',
+        config: {
+          question: 'Explain why population grows rapidly in Stage 2.',
+          rubric: [
+            'Death rates fall first (sanitation, medicine, food).',
+            'Birth rates stay high for a while.',
+            'The gap between births and deaths (natural increase) widens.',
+          ],
+          sampleAnswer:
+            'In Stage 2, death rates plunge as public health improves, but birth rates stay high. The big gap between births and deaths means natural increase is large, so population grows fast.',
+          placeholder: 'Think about what happens to deaths vs births in Stage 2…',
+          minChars: 20,
+        },
+      },
+      feedback: {
+        correct: 'Nice — you explained the Stage 2 boom in your own words.',
+        incorrect: 'Try to mention deaths falling, births staying high, and the gap between them.',
       },
     },
   ],

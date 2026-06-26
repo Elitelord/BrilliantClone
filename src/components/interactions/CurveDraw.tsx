@@ -117,7 +117,7 @@ export default function CurveDraw({ config, onChange, disabled, answer, result }
         onPointerUp={handleUp}
         onPointerLeave={handleUp}
         role="img"
-        aria-label="Draw the birth and death rate curves across the five stages"
+        aria-label={`Draw the rate curves across the five points along the ${config.xLabel ?? 'DTM Stage'} axis`}
       >
         {/* y grid */}
         {[0, 10, 20, 30, 40].map((v) => (
@@ -129,17 +129,17 @@ export default function CurveDraw({ config, onChange, disabled, answer, result }
           </g>
         ))}
 
-        {/* stage separators + labels */}
-        {STAGES.map((s) => (
+        {/* stage (or custom time) separators + labels */}
+        {STAGES.map((s, i) => (
           <g key={s}>
             <line x1={x(s)} x2={x(s)} y1={PAD.top} y2={H - PAD.bottom} stroke="#f1f5f9" strokeWidth={1} />
             <text x={x(s)} y={H - PAD.bottom + 16} textAnchor="middle" fontSize={10} fill="#64748b" fontWeight={600}>
-              {s}
+              {config.xTicks?.[i] ?? s}
             </text>
           </g>
         ))}
         <text x={(PAD.left + W - PAD.right) / 2} y={H - 4} textAnchor="middle" fontSize={9} fill="#94a3b8">
-          DTM Stage
+          {config.xLabel ?? 'DTM Stage'}
         </text>
 
         {/* faint reference curves (already-built or given for context) */}

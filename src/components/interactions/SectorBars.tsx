@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { dominantSector, impliedStageFromSectors, SECTOR_LABEL } from '../../lib/dtm';
+import {
+  dominantSector,
+  impliedStageFromSectors,
+  sectorStageConfident,
+  SECTOR_LABEL,
+  STAGE_CHIP_STYLE,
+  STAGE_SECTOR_PROFILES,
+} from '../../lib/dtm';
 import { clientToSvg, clamp } from '../../lib/svg';
 import type { SectorConfig } from '../../types/content';
 import type { SectorState } from '../../types/interaction';
@@ -94,8 +101,32 @@ export default function SectorBars({ config, onChange, disabled }: Props) {
     (e.target as Element).releasePointerCapture?.(e.pointerId);
   };
 
+  const applyPreset = (stage: number) => {
+    if (disabled) return;
+    const p = STAGE_SECTOR_PROFILES[stage];
+    const next: [number, number, number] = [p.primary, p.secondary, p.tertiary];
+    setVals(next);
+    emit(next, selectedStage);
+  };
+
+  const implied = impliedStageFromSectors(vals[0], vals[1], vals[2]);
+  const confident = sectorStageConfident(vals[0], vals[1], vals[2]);
+
+  const PRESET_STAGES: Array<{ stage: number; label: string }> = [
+    { stage: 2, label: 'Stage 2 · agrarian' },
+    { stage: 3, label: 'Stage 3 · industrial' },
+    { stage: 4, label: 'Stage 4 · services' },
+  ];
+
+  // The explore variant splits into two columns on wide screens: bars on the
+  // left, the implied-stage chip + stage presets on the right.
+  const twoCol = !isClassify && (config.showImpliedStage === true || config.showStagePresets === true);
+
   return (
     <div className="w-full select-none">
+      <div className={twoCol ? 'lg:grid lg:grid-cols-2 lg:items-center lg:gap-5' : ''}>
+      {/* left column: bars + leading sector */}
+      <div className={twoCol ? 'lg:min-w-0' : ''}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
@@ -117,7 +148,7 @@ export default function SectorBars({ config, onChange, disabled }: Props) {
               <text x={cx} y={barTop - 6} textAnchor="middle" fontSize={12} fontWeight={700} fill={COLORS[i]}>
                 {Math.round(vals[i])}%
               </text>
-              {!isClassify && (
+              {!isClassify && !disabled && (
                 <circle cx={cx} cy={barTop} r={drag === i ? 10 : 8} fill="#fff" stroke={COLORS[i]} strokeWidth={3} />
               )}
               <text x={cx} y={BASELINE + 16} textAnchor="middle" fontSize={10} fontWeight={600} fill="#475569">
@@ -141,6 +172,56 @@ export default function SectorBars({ config, onChange, disabled }: Props) {
           Leading sector: <span className="font-bold text-slate-700">{SECTOR_LABEL[dominantSector(vals[0], vals[1], vals[2])]}</span>
         </div>
       )}
+      </div>
+
+      {/* right column: implied stage + snap-to-a-stage presets */}
+      <div className={twoCol ? 'lg:min-w-0' : ''}>
+      {!isClassify && config.showImpliedStage && (
+        <div className="mt-2 flex justify-center">
+          {confident ? (
+            <span
+              className="rounded-full border px-3 py-1 text-sm font-bold"
+              style={{
+                background: STAGE_CHIP_STYLE[implied].bg,
+                color: STAGE_CHIP_STYLE[implied].text,
+                borderColor: STAGE_CHIP_STYLE[implied].border,
+              }}
+            >
+              Implied stage {implied}
+            </span>
+          ) : (
+            <span className="text-sm font-medium text-slate-400">
+              No single sector clearly leads yet — keep dragging.
+            </span>
+          )}
+        </div>
+      )}
+
+      {!isClassify && config.showStagePresets && (
+        <div className="mt-3">
+          <div className="mb-2 text-center text-sm font-medium text-slate-500">Snap to a stage</div>
+          <div className="flex flex-wrap justify-center gap-2">
+            {PRESET_STAGES.map(({ stage, label }) => (
+              <button
+                key={stage}
+                type="button"
+                disabled={disabled}
+                onClick={() => applyPreset(stage)}
+                className="h-11 rounded-xl border-2 px-3 text-sm font-bold transition disabled:opacity-60"
+                style={{
+                  background: STAGE_CHIP_STYLE[stage].bg,
+                  color: STAGE_CHIP_STYLE[stage].text,
+                  borderColor: STAGE_CHIP_STYLE[stage].border,
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      </div>
+      </div>
 
       {isClassify && (
         <div className="mt-3">

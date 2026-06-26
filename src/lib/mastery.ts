@@ -5,7 +5,12 @@ export const MASTERY_THRESHOLD = 60; // lesson score (%) to count as "mastered"
 export const REVIEW_WRONG_THRESHOLD = 2; // wrong attempts on a step -> surface review
 
 export function gradableSteps(lesson: Lesson): Lesson['steps'] {
-  return lesson.steps.filter((s) => s.kind !== 'explore' && s.kind !== 'learn');
+  return lesson.steps.filter(
+    (s) =>
+      s.kind !== 'explore' &&
+      s.kind !== 'learn' &&
+      s.interaction.type !== 'explain-back',
+  );
 }
 
 /** A graded step was answered correctly on the first check (no prior wrong attempts). */
@@ -110,7 +115,7 @@ export function updateMasteryForConcepts(
       strength,
       lastSeen: Date.now(),
       wrongCount: (prev?.wrongCount ?? 0) + (correct ? 0 : 1),
-      nextDue: prev?.nextDue, // reserved for brief Phase 3
+      ...(prev?.nextDue !== undefined ? { nextDue: prev.nextDue } : {}),
     };
   }
   return next;

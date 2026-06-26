@@ -116,6 +116,81 @@ export function gapAtStage(stage: number): number {
   return birth - death;
 }
 
+export interface IdealizedPoint {
+  year: number;
+  birth: number;
+  death: number;
+  pop: number; // millions
+}
+
+/** Minimal real-country shape consumed by {@link idealizedCountrySeries}. */
+export interface CountrySeriesPoint {
+  year: number;
+  birth: number;
+  death: number;
+  pop: number; // millions
+}
+
+/**
+ * Idealized "textbook" DTM baseline for the Textbook-vs-Actual comparison.
+ * It answers: "if this country ran the STANDARD demographic transition —
+ * births minus deaths only, no migration, at an even pace — what would its
+ * rates and population look like?", so the real curve can be read against it.
+ *
+ * Stylized teaching baseline, NOT demographically exact. Design choices:
+ *  - It begins at the DTM stage the country's FIRST real data point already
+ *    sits in (via stageFromRates), so we don't pretend a 1970 oil state or
+ *    1950 South Korea started at pristine Stage 1 — that mis-anchoring is what
+ *    crushed the old curve (every series forced to span Stage 1→5 regardless
+ *    of where the country actually was).
+ *  - It advances evenly to Stage 4 ("Low Stationary"), where births and deaths
+ *    re-converge and population STABILIZES. We deliberately stop at Stage 4 and
+ *    NOT Stage 5: the textbook prediction is "complete the transition and level
+ *    off." Ending at Stage 5 (births below deaths → a SHRINKING population) is
+ *    demographically misleading for developing countries (e.g. Niger) and looks
+ *    odd (the population line dips down at the end).
+ *  - Population integrates the implied natural increase from the country's real
+ *    starting population using the AVERAGE (trapezoidal) rate over each interval,
+ *    giving a smooth S-curve that grows then levels rather than under-shooting.
+ *
+ * The contrast each real country then shows against this baseline:
+ *  - South Korea: real transition was COMPRESSED → real births dive below the
+ *    standard-pace baseline.
+ *  - Niger: real transition STALLED in Stage 2 → real births stay high above it
+ *    and real population overshoots it.
+ *  - UAE: labour migration → real population dwarfs this births-minus-deaths
+ *    baseline (migration is invisible to the DTM).
+ */
+export function idealizedCountrySeries(actual: CountrySeriesPoint[]): IdealizedPoint[] {
+  if (actual.length === 0) return [];
+  const first = actual[0];
+  const last = actual[actual.length - 1];
+  const span = last.year - first.year || 1;
+
+  // Start where the country really is; aim at stable Stage 4 (never go backwards
+  // if it already begins at or past Stage 4).
+  const startStage = stageFromRates(first.birth, first.death);
+  const endStage = Math.max(startStage, 4);
+
+  // Pass 1: birth/death at each year along an even stage path.
+  const rates = actual.map((p) => {
+    const stage = startStage + ((p.year - first.year) / span) * (endStage - startStage);
+    return { year: p.year, ...ratesAtStage(stage) };
+  });
+
+  // Pass 2: integrate population with the mean NIR across each interval.
+  let pop = first.pop;
+  return rates.map((pt, i) => {
+    if (i > 0) {
+      const prev = rates[i - 1];
+      const dt = pt.year - prev.year;
+      const avgGap = (prev.birth - prev.death + (pt.birth - pt.death)) / 2;
+      pop = pop * Math.pow(1 + avgGap / 1000, dt);
+    }
+    return { year: pt.year, birth: pt.birth, death: pt.death, pop };
+  });
+}
+
 /** Stage where birth and death rates cross (NIR = 0) between Stage 4 and 5. */
 export function nirZeroCrossingStage(): number {
   let lo = 4;
@@ -273,6 +348,158 @@ export function impliedStageFromPyramid(base: number, top: number): number {
   return 4;
 }
 
+// ---- Age bands & dependency ratio ----------------------------------------
+const PYRAMID_CONTROL_COHORTS = [0, 3, 6, 8] as const;
+
+/** Expand four control widths to nine cohort widths (young → old). */
+export function cohortWidthsFromControls(controls: [number, number, number, number]): number[] {
+  const widths: number[] = [];
+  for (let cohort = 0; cohort < 9; cohort++) {
+    let seg = 0;
+    while (seg < PYRAMID_CONTROL_COHORTS.length - 1 && cohort > PYRAMID_CONTROL_COHORTS[seg + 1]) seg++;
+    const c0 = PYRAMID_CONTROL_COHORTS[seg];
+    const c1 = PYRAMID_CONTROL_COHORTS[seg + 1];
+    const t = c1 === c0 ? 0 : (cohort - c0) / (c1 - c0);
+    widths.push(lerp(controls[seg], controls[seg + 1], t));
+  }
+  return widths;
+}
+
+/** Sample four control cohorts from nine cohort widths (young → old). */
+export function controlsFromCohortWidths(
+  widths: number[],
+): [number, number, number, number] {
+  return [widths[0], widths[3], widths[6], widths[8]];
+}
+
+export const STAGE_PYRAMID_COHORTS: Record<
+  number,
+  [number, number, number, number, number, number, number, number, number]
+> = Object.fromEntries(
+  Object.entries(STAGE_PYRAMID_PROFILES).map(([stage, profile]) => [
+    Number(stage),
+    cohortWidthsFromControls(profile) as [number, number, number, number, number, number, number, number, number],
+  ]),
+) as Record<number, [number, number, number, number, number, number, number, number, number]>;
+
+/** Stylized age-band sums on the 9-cohort model (widths as population proxy). */
+function bandSumsFromWidths(widths: number[]): { youth: number; working: number; elderly: number } {
+  const youth = widths[0] + widths[1];
+  const working = widths.slice(2, 7).reduce((sum, w) => sum + w, 0);
+  const elderly = widths[7] + widths[8];
+  return { youth, working, elderly };
+}
+
+export interface DependencyBreakdown {
+  /** Youth (0–14) per 100 working-age (15–64). */
+  youth: number;
+  /** Elderly (65+) per 100 working-age (15–64). */
+  elderly: number;
+  /** Total dependents per 100 working-age — youth + elderly ratios. */
+  total: number;
+}
+
+export function dependencyBreakdownFromWidths(widths: number[]): DependencyBreakdown {
+  const { youth, working, elderly } = bandSumsFromWidths(widths);
+  if (working <= 0) return { youth: 0, elderly: 0, total: 0 };
+  const youthRatio = (youth / working) * 100;
+  const elderlyRatio = (elderly / working) * 100;
+  return { youth: youthRatio, elderly: elderlyRatio, total: youthRatio + elderlyRatio };
+}
+
+export function dependencyBreakdownFromControls(
+  controls: [number, number, number, number],
+): DependencyBreakdown {
+  return dependencyBreakdownFromWidths(cohortWidthsFromControls(controls));
+}
+
+/** Stylized dependency ratio on the 9-cohort model: (youth + elderly) / working × 100. */
+export function dependencyRatioFromControls(controls: [number, number, number, number]): number {
+  return dependencyBreakdownFromControls(controls).total;
+}
+
+export function dependencyRatioFromCohorts(
+  cohorts: [number, number, number, number, number, number, number, number, number],
+): number {
+  return dependencyBreakdownFromWidths(cohorts).total;
+}
+
+export function dependencyBreakdownFromCohorts(
+  cohorts: [number, number, number, number, number, number, number, number, number],
+): DependencyBreakdown {
+  return dependencyBreakdownFromWidths(cohorts);
+}
+
+// ---- Pyramid anomaly presets (explicit 9-cohort widths) ------------------
+export interface AnomalyPyramidPreset {
+  id: string;
+  label: string;
+  cohorts: [number, number, number, number, number, number, number, number, number];
+  maleCohorts?: [number, number, number, number, number, number, number, number, number];
+  femaleCohorts?: [number, number, number, number, number, number, number, number, number];
+  caption: string;
+}
+
+export const ANOMALY_PYRAMIDS: AnomalyPyramidPreset[] = [
+  {
+    id: 'smooth',
+    label: 'Smooth column',
+    cohorts: [0.42, 0.42, 0.44, 0.44, 0.42, 0.40, 0.38, 0.36, 0.34],
+    caption: 'Idealized Stage 4 column — even bars, no event scars.',
+  },
+  {
+    id: 'warNotch',
+    label: 'War notch',
+    cohorts: [0.82, 0.78, 0.72, 0.34, 0.28, 0.30, 0.48, 0.52, 0.48],
+    maleCohorts: [0.82, 0.78, 0.72, 0.18, 0.14, 0.16, 0.42, 0.46, 0.44],
+    femaleCohorts: [0.82, 0.78, 0.72, 0.58, 0.54, 0.52, 0.54, 0.58, 0.52],
+    caption: 'War deaths notch fighting-age men — women outnumber men at those ages.',
+  },
+  {
+    id: 'guestWorker',
+    label: 'Guest-worker bulge',
+    cohorts: [0.48, 0.52, 0.88, 0.94, 0.86, 0.68, 0.52, 0.44, 0.40],
+    maleCohorts: [0.48, 0.52, 0.92, 0.98, 0.90, 0.72, 0.52, 0.44, 0.40],
+    femaleCohorts: [0.48, 0.50, 0.42, 0.44, 0.40, 0.36, 0.34, 0.32, 0.30],
+    caption: 'Young male workers spike in — families usually stay home.',
+  },
+  {
+    id: 'oneChild',
+    label: 'One-child constriction',
+    cohorts: [0.24, 0.22, 0.20, 0.34, 0.46, 0.58, 0.66, 0.72, 0.70],
+    maleCohorts: [0.28, 0.26, 0.22, 0.36, 0.48, 0.58, 0.66, 0.72, 0.70],
+    femaleCohorts: [0.20, 0.18, 0.16, 0.30, 0.42, 0.54, 0.64, 0.70, 0.68],
+    caption: 'Few children at the base — more boys than girls from son preference.',
+  },
+  {
+    id: 'babyBoom',
+    label: 'Baby-boom bulge',
+    cohorts: [0.44, 0.42, 0.40, 0.76, 0.82, 0.78, 0.54, 0.46, 0.40],
+    caption: 'A fat middle band — a baby-boom cohort aging up the pyramid.',
+  },
+];
+
+/** Same anomaly ~25 years later — bulge/notch/pinch climb one stage up the pyramid. */
+export const ANOMALY_AGED: Record<string, Pick<AnomalyPyramidPreset, 'maleCohorts' | 'femaleCohorts' | 'cohorts'>> = {
+  babyBoom: {
+    cohorts: [0.38, 0.36, 0.34, 0.42, 0.44, 0.72, 0.84, 0.80, 0.52],
+    maleCohorts: [0.38, 0.36, 0.34, 0.42, 0.44, 0.72, 0.84, 0.80, 0.52],
+    femaleCohorts: [0.38, 0.36, 0.34, 0.42, 0.44, 0.72, 0.84, 0.80, 0.52],
+  },
+};
+
+/** Country ↔ anomaly fingerprint (historical AP Human Geography examples). */
+export const COUNTRY_ANOMALY_MATCH: Record<string, string> = {
+  warNotch: 'germany',
+  guestWorker: 'qatar',
+  oneChild: 'china',
+  babyBoom: 'usa',
+};
+
+export const ANOMALY_PYRAMIDS_BY_ID: Record<string, AnomalyPyramidPreset> = Object.fromEntries(
+  ANOMALY_PYRAMIDS.map((p) => [p.id, p]),
+);
+
 // ---- Sector employment --------------------------------------------------
 export function dominantSector(p: number, s: number, t: number): Sector {
   if (p >= s && p >= t) return 'primary';
@@ -281,11 +508,26 @@ export function dominantSector(p: number, s: number, t: number): Sector {
 }
 
 export function impliedStageFromSectors(p: number, s: number, t: number): number {
-  if (p >= 50) return 2; // agrarian -> early stage
-  if (t >= 55) return 4; // service economy -> developed
-  if (s >= 35 && s >= t) return 3; // industrial peak
-  return 3;
+  if (s >= p && s >= t) return 3; // industry leads -> Stage 3 (industrial peak)
+  if (t >= p && t >= s) return 4; // services lead  -> Stage 4 (developed)
+  return 2; // farming leads  -> Stage 2 (agrarian)
 }
+
+/** True when the leading sector clearly leads the runner-up (not a near-tie),
+ *  so an implied-stage chip is trustworthy on the explore step. */
+export function sectorStageConfident(p: number, s: number, t: number): boolean {
+  const sorted = [p, s, t].sort((a, b) => b - a);
+  return sorted[0] - sorted[1] >= 12;
+}
+
+/** Canonical employment mix per DTM stage (Clark–Fisher). Sums to 100. */
+export const STAGE_SECTOR_PROFILES: Record<number, { primary: number; secondary: number; tertiary: number }> = {
+  1: { primary: 80, secondary: 12, tertiary: 8 },
+  2: { primary: 70, secondary: 18, tertiary: 12 },
+  3: { primary: 25, secondary: 45, tertiary: 30 },
+  4: { primary: 8, secondary: 27, tertiary: 65 },
+  5: { primary: 3, secondary: 22, tertiary: 75 },
+};
 
 export const SECTOR_LABEL: Record<Sector, string> = {
   primary: 'Farming (primary)',
