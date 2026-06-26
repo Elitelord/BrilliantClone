@@ -79,7 +79,7 @@ export function buildSkillCheckLearnerContext(
 
   blocks.push(
     '',
-    'Generate 3 AP-style MCQs with extra weight on struggled concepts/steps. Do not reuse lesson step prompts verbatim.',
+    'Write 3 AP-exam-level MCQs (application/analysis, not recall) with extra weight on the struggled concepts/steps above. Re-test misconceptions the learner showed, using fresh real-world scenarios. Do not reuse lesson step prompts verbatim.',
   );
 
   return blocks.join('\n');

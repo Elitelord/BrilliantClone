@@ -1,5 +1,4 @@
 import { generateJson } from '../generate';
-import { TUTOR_SYSTEM_INSTRUCTION } from '../context';
 import { skillCheckBatchSchema } from '../schema';
 import { buildSkillCheckLearnerContext } from '../skillCheckContext';
 import {
@@ -14,18 +13,51 @@ import type { Lesson } from '../../../types/content';
 import type { LessonProgress, MasteryRecord } from '../../../types/progress';
 import type { McOption } from '../../../types/content';
 
-const SKILL_CHECK_TASK = [
-  'Generate exactly 3 AP Human Geography multiple-choice questions for a skill check after this lesson.',
-  'Use ONLY these templates (pick variety):',
-  '- stage-from-rates: scenario MUST include numeric cbr and cdr; options labeled Stage 1 through Stage 5',
-  '- population-trend: scenario MUST include numeric cbr and cdr; options describe stable/growing/rapid growth/shrinking',
-  '- pyramid-stage: scenario MUST include numeric stage (1-5) AND pyramidDescription; options labeled Stage 1-5',
-  '- sector-dominant: scenario MUST include numeric primary, secondary, tertiary (percentages); options name dominant sector',
-  '- cause-of-death: scenario MUST include numeric stage (1-5); options name infectious vs chronic causes',
-  'Each question needs exactly 4 options with ids a,b,c,d and full descriptive labels (not just "A" or "B").',
-  'claimedCorrectId MUST be the id (a/b/c/d) of the logically correct option.',
-  'Include a one-line explanation for each.',
+const SKILL_CHECK_SYSTEM_INSTRUCTION = [
+  'You are an experienced AP Human Geography exam item writer creating stimulus-based multiple-choice questions for Unit 2 (Population & Migration), focused on the Demographic Transition Model.',
+  'Write at genuine AP exam difficulty: every question must require APPLICATION or ANALYSIS, never bare recall.',
+  'Mirror College Board style: a concrete real-world stimulus (a named or described country/region with data), an AP command phrasing ("which of the following BEST explains", "is most strongly supported by", "would most likely result in"), and four plausible options.',
+  'Distractors must be genuinely tempting — each should encode a specific, common student misconception, not an obviously wrong throwaway.',
+  'Output strictly valid JSON. Do not reveal the answer anywhere except claimedCorrectId and the explanation.',
 ].join(' ');
+
+const SKILL_CHECK_TASK = [
+  'Generate exactly 3 AP-exam-level multiple-choice questions for a skill check after this lesson.',
+  '',
+  'RIGOR REQUIREMENTS (apply to every question):',
+  '- The "prompt" must be an applied stimulus: situate the data in a realistic country/region with a short scenario, then ask a reasoning question. Do NOT write bare lookups like "CBR 38, CDR 20 — which stage?".',
+  '- Use AP command terms (BEST explains, most strongly supported, most likely to, primarily because).',
+  '- Reward second-order reasoning (cause→effect, implication, comparison), not just classification.',
+  '- All 4 distractors must be plausible and target distinct misconceptions; never include filler options.',
+  '- Use all 3 different templates when possible; weight toward concepts the learner struggled with.',
+  '- Do NOT reuse a lesson step prompt verbatim.',
+  '',
+  'TEMPLATES — pick the template that fits each question. The "scenario" object MUST carry the structured numbers (this is how the answer is independently verified), even though the prompt also weaves them into prose:',
+  '- stage-from-rates: scenario MUST include numeric cbr and cdr; one option per relevant DTM stage, labels MUST contain "Stage 1".."Stage 5".',
+  '- population-trend: scenario MUST include numeric cbr and cdr; option labels MUST clearly read as stable / growing / rapid growth / shrinking.',
+  '- pyramid-stage: scenario MUST include numeric stage (1-5) AND a vivid pyramidDescription; option labels MUST contain "Stage 1".."Stage 5".',
+  '- sector-dominant: scenario MUST include numeric primary, secondary, tertiary percentages; option labels MUST name the dominant sector (primary/secondary/tertiary).',
+  '- cause-of-death: scenario MUST include numeric stage (1-5); option labels MUST name infectious/communicable vs chronic/degenerative causes.',
+  '',
+  'FORMAT: exactly 4 options per question with ids a,b,c,d and full descriptive labels (never just "A"). claimedCorrectId MUST be the id of the logically correct option. Keep the explanation to one sharp sentence that names the principle, not just the answer.',
+  '',
+  'EXAMPLE of the rigor and exact shape expected (do not copy its content):',
+  JSON.stringify({
+    template: 'stage-from-rates',
+    prompt:
+      'Country X has invested heavily in vaccination and clean water over two decades. Its crude death rate has fallen to 9 per 1,000 while its crude birth rate remains high at 36 per 1,000. Which DTM stage BEST characterizes Country X, and why?',
+    scenario: { cbr: 36, cdr: 9 },
+    options: [
+      { id: 'a', label: 'Stage 1 — births and deaths are both high and roughly balanced' },
+      { id: 'b', label: 'Stage 2 — deaths have dropped sharply while births stay high, so the gap widens' },
+      { id: 'c', label: 'Stage 4 — births and deaths are both low and nearly equal' },
+      { id: 'd', label: 'Stage 5 — deaths exceed births and the population declines' },
+    ],
+    claimedCorrectId: 'b',
+    explanation:
+      'A collapsing death rate alongside a still-high birth rate is the signature widening gap of Stage 2.',
+  }),
+].join('\n');
 
 const inflight = new Map<string, Promise<VerifiedSkillCheckQuestion[] | null>>();
 
@@ -223,8 +255,8 @@ async function generateSkillCheckInner(
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const raw = await generateJson<unknown>(prompt, skillCheckBatchSchema, {
-      systemInstruction: TUTOR_SYSTEM_INSTRUCTION,
-      temperature: 0.5,
+      systemInstruction: SKILL_CHECK_SYSTEM_INSTRUCTION,
+      temperature: 0.4,
       maxOutputTokens: 4096,
       timeoutMs: 30_000,
       jsonKeyHint:
