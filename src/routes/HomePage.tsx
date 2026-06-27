@@ -83,6 +83,17 @@ export default function HomePage() {
         </button>
       )}
 
+      {/* FRQ exam practice */}
+      <button
+        type="button"
+        onClick={() => navigate('/frq')}
+        className="mb-6 w-full rounded-3xl bg-gradient-to-br from-indigo-600 to-indigo-500 p-5 text-left text-white shadow-lg shadow-indigo-600/20 active:scale-[0.99]"
+      >
+        <div className="text-xs font-semibold uppercase tracking-wide text-indigo-100">Exam practice</div>
+        <div className="mt-1 text-lg font-bold">Practice an AP-style free-response question</div>
+        <div className="mt-3 inline-block rounded-full bg-white/20 px-3 py-1 text-sm font-semibold">Start FRQ →</div>
+      </button>
+
       {/* progress stats — side by side on large screens */}
       {hasMastery ? (
         <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-4">

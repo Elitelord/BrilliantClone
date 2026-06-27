@@ -9,6 +9,8 @@ import LeaderboardPage from './routes/LeaderboardPage';
 import AccountPage from './routes/AccountPage';
 import LessonPage from './routes/LessonPage';
 import ReviewPage from './routes/ReviewPage';
+import FrqIndexPage from './routes/FrqIndexPage';
+import FrqPage from './routes/FrqPage';
 
 export default function App() {
   const init = useAuthStore((s) => s.init);
@@ -28,6 +30,8 @@ export default function App() {
           </Route>
           <Route path="/lesson/:lessonId" element={<LessonPage />} />
           <Route path="/review" element={<ReviewPage />} />
+          <Route path="/frq" element={<FrqIndexPage />} />
+          <Route path="/frq/:id" element={<FrqPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
