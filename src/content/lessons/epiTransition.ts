@@ -10,6 +10,7 @@ export const epiTransition: Lesson = {
   subtitle: 'Why deaths fall fast, births fall slow, and the lag between them',
   concept:
     'Deaths fall first and fast because public health (clean water, vaccines, food, medicine) reaches everyone quickly. Births fall later and slowly because family size is a personal choice that only changes as farms become cities and children become school + cost. That lag — fast death drop, slow birth drop — is the Stage 2 boom you saw in Lesson 1.',
+  cedTopics: ['2.5', '2.8', '2.7'],
   order: 3,
   prerequisites: ['population-pyramids'],
   steps: [

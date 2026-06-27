@@ -815,6 +815,9 @@ export interface Lesson {
   title: string;
   subtitle?: string;
   concept: string; // one-line summary of the idea taught
+  /** AP CED topic codes this lesson covers (e.g. ['2.5','2.8']) — see src/lib/ced/unit2.ts.
+   *  Grounds AI skill-check generation in the specific subunit(s). */
+  cedTopics?: string[];
   order: number;
   prerequisites: string[]; // lesson ids
   steps: Step[];

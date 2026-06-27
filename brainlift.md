@@ -31,12 +31,12 @@ The purpose of this BrainLift is to develop a rigorous, defensible point of view
 
 > **Reserved for the owner.** A Spiky POV is a well-reasoned, actionable, often contrarian argument synthesized from multiple DOK 3 insights. Do not fill this in with AI — this is the part that must be entirely your own.
 
-- **Spiky POV 1:** _[State your first Spiky POV as a strong, clear assertion.]_
-  - **Elaboration:** _[Defend it by synthesizing your DOK 3 insights and DOK 2 knowledge tree. Explain its implications and why it is novel.]_
-- **Spiky POV 2:** _[State your second Spiky POV.]_
-  - **Elaboration:** _[Defend and elaborate, connecting back to your foundational research.]_
-- **Spiky POV 3:** _[Optional — add as many as you forge.]_
-  - **Elaboration:** _[...]_
+- **Spiky POV 1:** We shouldn't try to make learning fun. 
+  - **Elaboration:** According to the science of learning, higher levels of difficulty along with assessment and other testing forms both contribute to better recall capability. These practices usually don't make for "fun" learning but they do make it quicker. Focusing on these instead of fun learning provides better outcomes in shorter time. 
+- **Spiky POV 2:** The application of AI into educational apps and teaching shouldn't operate on a large scale autonomously.
+  - **Elaboration:** Guides, verification layers, and human observation are all extremely important as seen by tendencies to hallucinate. Scoping AI into smaller-scoped interactions reduces the risk of hallucinations. Additionally, tailoring is needed for different content areas. Allowing AI to have a chance of hallucinating has been show by research to be incredibly harmful for learner's education, propogating miconceptions. 
+- **Spiky POV 3:** Gamification should be largely unnecessary in most educational apps. 
+  - **Elaboration:** As seen in Category 3's research of other apps, they largely use Gamification methods to increase engagement and consistency. Since these apps operate as standalone businesses, separate from public educational institutions, they require funding. This means increasing active user base with these gamified metric. In a future where public institutions integrate educational apps, the profit motive shouldn't drive the app's design. These apps should be solely for educational benefit and consistency will be enforced through external methods. This will improve relative effectiveness of the apps. 
 
 ---
 
@@ -44,7 +44,7 @@ The purpose of this BrainLift is to develop a rigorous, defensible point of view
 
 > Curated leading thinkers across (a) the science of learning and (b) AI in education. Following their work builds the foundational knowledge behind the DOK 3 insights and DOK 4 SPOVs.
 
-### A. The Science of Learning
+### A. The Science of Learning 
 
 **Robert A. Bjork (with Elizabeth Ligon Bjork)**
 - **Who:** Distinguished Research Professor of Psychology, UCLA; directs the Bjork Learning & Forgetting Lab.
@@ -148,19 +148,18 @@ The purpose of this BrainLift is to develop a rigorous, defensible point of view
 
 ### From the Science of Learning
 
-- **Insight 1:** _[Your original idea/connection.]_
-- **Insight 2:** _[...]_
+- **Insight 1:** A lot of learning comes at a specific middle point, many tactics like spacing and interleaving can be ineffective at extreme ends. These require a balanced approach to have optimal effect. 
+- **Insight 2:** Oftentimes, difficult assessments and testing are the most effective provided they aren't too difficult that recall fails entirely. 
 
 ### From Applying AI to Learning
 
-- **Insight 1:** _[...]_
-- **Insight 2:** _[...]_
+- **Insight 1:** Chatbot based AI learning is the most widely desired, with heavy marketing surrounding it. However, there are many valid questions regarding effectiveness. Specific studies show that it can be "near-human" levels, but recent platform integrations haven't shown as strong results. 
+- **Insight 2:** With a proper framework, AI has been proven to be effective for feedback and limited scope interactions. Research shows that attempting to generalize it largely increases Hallucination. 
 
 ### From Grounding & Verification (this project)
 
-- **Insight 1:** _[...]_
-- **Insight 2:** _[...]_
-
+- **Insight 1:** Every educational application has been integrating AI recently. Although they seem to have different strategies, from Brilliant's activity-based mindset to Mentava's off-ramping strategy, most of them focus on motivation with gamified design. 
+- **Insight 2:** Many apps, including this one, strategize each lesson as data, with duolingo these are more modular as they go question by question. This engineering decision makes it much easier to add features on, adapt lessons for newer styles, and tune lessons to the user's understanding and knowledge. 
 ---
 
 ## DOK 2: Knowledge Tree
@@ -475,6 +474,7 @@ The purpose of this BrainLift is to develop a rigorous, defensible point of view
 - **DOK 1 — Facts:**
   - The subject is the **Demographic Transition Model**, a unit of AP Human Geography; the persona is a **14–15-year-old** studying for the AP exam.
   - The MVP is **3 interactive lessons that build on each other** (the DTM engine; reading population pyramids; sector employment shift), each with ≥1 directly-manipulated problem and a real-time-responding visual.
+  - *(Shipped state, post-MVP — `src/content/index.ts`):* the course has since grown from that 3-lesson MVP into a **7-lesson Unit 2 arc**: (1) The Engine of Growth, (2) Reading Population Pyramids, (3) Why the Curves Move (epidemiological transition + fertility transition + population policy), (4) The Limits of Growth (density + carrying capacity + Malthus/Boserup), (5) Reading the Shape (dependency ratio, momentum, pyramid anomalies), (6) Why People Move (migration), and (7) Place the Country (synthesis capstone) — mapped to CED topics 2.2–2.12.
   - Hard rule: the app must **teach the core idea without any AI doing the work**; *all AI features are explicitly out of MVP scope (Phase 2)* and the learning-science layer (spaced repetition, interleaving, scaffolding/fading) is **Phase 3**.
   - Feedback is **instant (<100ms target), specific, hand-written**; wrong answers get a hint/explanation tied to the likely misconception, then a retry — "never just a red X."
   - Tech: React + TypeScript + Vite + Firebase; lessons authored as **typed JSON/TS objects validated against a shared `Lesson`/`Step` schema** (data-driven, AI-generatable later).
@@ -487,7 +487,7 @@ The purpose of this BrainLift is to develop a rigorous, defensible point of view
 
 - **DOK 1 — Facts:**
   - Three hard rules for every AI feature: **ground it in the lesson's structured state, not raw text**; **verify anything checkable against the subject's logic**; **the app must keep teaching with AI turned off** (AI = additions, not replacements).
-  - Chosen backend: **Firebase AI Logic (Gemini Developer API)** — free tier, keys never on client (secured by App Check), and **native JSON-schema structured output** for validated generation.
+  - Backend: the notes **originally chose Firebase AI Logic (Gemini Developer API)** for its free tier, client-side key safety (App Check), and native JSON-schema output — but what **shipped is a provider-agnostic AI layer** (`src/lib/ai/provider/` — firebase / openai / gemini-api / proxy behind one `generateText` / `generateJson` interface), currently running the **OpenAI provider on `gpt-4o`**, with an automatic one-time fallback to **`gpt-4o-mini`** on a model-access error. Swapping providers never touches feature code.
   - Shipping AI features: (1) **Wrong-answer nudge** grounded in the learner's current attempt + validator outcome; (2) **AP-style end-of-lesson Skill Check** (3-question MCQ) where `verify.ts` **recomputes correct answers from `dtm.ts`** before display; (3) **"Explain it back"** AI-graded free response (the step is *omitted entirely when AI is off*).
   - **Deliberately skipped:** a free-roaming chatbot tutor (the brief warns against bolting one on — "not grounded, low signal") and full LLM-driven path reordering (deterministic mastery gating "does this honestly; an LLM adds risk, not value").
 - **DOK 2 — Summary:** The decision log is a case study in *restraint as design*: the team picks AI features that exploit the structured substrate (nudges grounded in validator outcomes, generated questions re-checked against a math engine) and refuses the seductive, ungrounded ones (open chatbot, LLM path control). The principle "AI is additive, never load-bearing" is enforced by making AI-only steps gracefully vanish when AI is disabled.
@@ -496,12 +496,12 @@ The purpose of this BrainLift is to develop a rigorous, defensible point of view
 **Source: `src/lib/ai/verify.ts` + `src/lib/ai/features/skillCheck.ts` + `schema.ts` — the verification layer (source code)**
 
 - **DOK 1 — Facts:**
-  - The LLM is constrained to a fixed set of **question templates** (e.g. `stage-from-rates`, `population-trend`, `pyramid-stage`, `sector-dominant`, `cause-of-death`, `net-migration`, `density-measure`, `malthus-outcome`) and must emit a structured `scenario` object **so the answer can be independently recomputed**.
-  - `computeCorrectOptionId()` re-derives the correct answer **deterministically from `dtm.ts`** (e.g. `stageFromRates`, `trendFromGap`, `dominantSector`, `malthusCrossover`); `verifySkillCheckQuestion()` **rejects any question whose AI-claimed answer doesn't match the recomputed one**, and uses the recomputed answer regardless of what the model claimed.
-  - Generation **retries up to 3×**, requires **4 options** per item, and **drops** questions that fail verification (ships only verified items, or none).
-  - The skill-check prompt demands **AP-exam rigor** (applied stimulus, AP command terms, distractors that each encode a *specific misconception*) and weights toward concepts the learner's mastery record shows are weak.
-- **DOK 2 — Summary:** This is the technical heart of "verify anything checkable." The LLM is treated as an *untrusted drafter* of natural-language stimulus; the *truth* always comes from deterministic subject logic. Schema-enforced JSON + template constraints + recomputation turns a hallucination-prone generator into a safe one: the worst case is a missing question, never a wrong one taught as right.
-- **Link to source:** `src/lib/ai/verify.ts`, `src/lib/ai/features/skillCheck.ts`, `src/lib/ai/schema.ts` (repo)
+  - **Two verification paths, never the model's say-so.** *Computational* items are constrained to a fixed template set — `stage-from-rates`, `population-trend`, `pyramid-stage`, `sector-dominant`, `cause-of-death`, `net-migration`, `density-measure`, `malthus-outcome`, `doubling-time`, `dependency-ratio`, `replacement-level` — and must emit a structured `scenario` object **so the answer can be independently recomputed**.
+  - `computeCorrectOptionId()` re-derives the correct answer **deterministically from `dtm.ts`** (`stageFromRates`, `trendFromGap`, `classifyPyramidControls`, `dominantSector`, `computeDensities`, `malthusCrossover`, `doublingTime`, `dependencyRatioFromBands`, plus TFR-vs-replacement); `verifySkillCheckQuestion()` **rejects any question whose AI-claimed answer doesn't match the recomputed one** and uses the recomputed answer regardless of what the model claimed. Generation **retries up to 3×**, requires **4 options**, and **drops** unverified items.
+  - **Qualitative reasoning items** (cause/effect, comparison, evaluation) have no formula to recompute, so `verifyBySolverAgreement()` (`features/qualitativeCheck.ts`) applies a second gate: after the writer model produces a question + claimed key, **two independent "cold solvers" answer it blind** — seeing only stem + options, never the key — with deliberately different framings and temperatures (a decisive solver at 0.15, a methodical one at 0.75). The question ships **only if both solvers pick the claimed answer and neither flags ambiguity** (a conservative consensus, not a proof).
+  - The skill check **grounds every question in the lesson's specific CED subunits** via `src/lib/ced/unit2.ts` (the College Board Unit 2 outline, topics 2.1–2.12): `skillCheckTemplatesForLesson()` picks allowed templates from the lesson's concept tags and `cedTopics`, and the prompt forbids drifting to other topics. It demands AP-exam rigor (applied stimulus, AP command terms, misconception-encoding distractors) and weights toward concepts the learner's mastery record shows are weak; the final mix favors ~2 agreement-verified qualitative items plus formula-verified computational ones.
+- **DOK 2 — Summary:** This is the technical heart of "verify anything checkable." The LLM is treated as an *untrusted drafter* of natural-language stimulus; the *truth* comes from deterministic subject logic where a formula exists, and from independent-solver consensus where it doesn't. Schema-enforced JSON + template constraints + recomputation (or blind double-solving) turn a hallucination-prone generator into a safe one: the worst case is a missing question, never a wrong one taught as right.
+- **Link to source:** `src/lib/ai/verify.ts`, `src/lib/ai/features/skillCheck.ts`, `src/lib/ai/features/qualitativeCheck.ts`, `src/lib/ai/schema.ts`, `src/lib/ced/unit2.ts` (repo)
 
 **Source: `src/lib/ai/hintGuard.ts` + `features/wrongAnswerNudge.ts` + `describeInteraction.ts` — grounding & no-giveaway guards (source code)**
 
@@ -531,8 +531,8 @@ The purpose of this BrainLift is to develop a rigorous, defensible point of view
 - **DOK 1 — Facts:**
   - Standard AP classroom consensus blends **direct instruction** with **data-heavy active learning** (country comparisons, pyramid construction, indicator tables); the dominant pattern is **inductive reasoning from evidence** (look first, classify, then receive vocabulary).
   - The app **flips the playbook** to explore/manipulate-first, which aligns with "predict first" and construct-and-interpret activities but de-emphasizes lecture and multi-country spreadsheet work.
-  - The app **over-indexes on consensus strengths** (manipulable visuals, rate-gap intuition, pyramid↔DTM mapping, real countries, scaffolded difficulty) and **under-indexes on CED breadth** (epidemiological transition, migration, dependency, momentum, policy, Malthus, historical pyramid scars).
-- **DOK 2 — Summary:** Independent research into how the subject is actually taught confirms the app is a high-quality *micro-course on the DTM core mechanism* rather than a full unit — and that its learn-by-doing stance matches the active-learning end of the pedagogical spectrum. This is the external benchmark against which AI-driven breadth expansion (more lessons, more item variety) can be judged.
+  - The original 3-lesson MVP **over-indexed on consensus strengths** (manipulable visuals, rate-gap intuition, pyramid↔DTM mapping, real countries, scaffolded difficulty) and **under-indexed on CED breadth**. The **7-lesson arc has since closed most of that gap**: epidemiological + fertility transition and population policy (L3), density + carrying capacity + Malthus/Boserup (L4), dependency ratio + momentum + historical pyramid scars/anomalies (L5), and migration (L6) are now their own lessons.
+- **DOK 2 — Summary:** Independent research into how the subject is actually taught confirms the app's learn-by-doing stance matches the active-learning end of the pedagogical spectrum, and that the build has grown from a *micro-course on the DTM core mechanism* into something approaching a **full Unit 2** (CED 2.2–2.12; pure distribution, topic 2.1, is deliberately set aside as too map-heavy to teach by manipulation). The remaining judgment call is per-topic item-writing rigor and depth, not breadth.
 - **Link to source:** `research/ap-human-geography-dtm-teaching-knowledge-base.md` (repo)
 
 ---
@@ -547,7 +547,7 @@ The purpose of this BrainLift is to develop a rigorous, defensible point of view
 | repo-phase2 | `PHASE2-AI-NOTES.md` | Primary (local) |
 | repo-phase3 | `PHASE3-LEARNING-SCIENCE.md` | Primary (local) |
 | repo-research | `research/ap-human-geography-dtm-teaching-knowledge-base.md` | Primary (local) |
-| repo-code | `src/lib/ai/*` (verify, skillCheck, hintGuard, describeInteraction, schema) | Primary (local) |
+| repo-code | `src/lib/ai/*` (verify, skillCheck, qualitativeCheck, hintGuard, describeInteraction, schema, provider/) + `src/lib/ced/unit2.ts` | Primary (local) |
 
 **External primary/landmark sources (full URLs in each subcategory above):**
 
@@ -606,7 +606,7 @@ The purpose of this BrainLift is to develop a rigorous, defensible point of view
 
 ### 1. Tools and workflow
 
-- **Primary tool: Cursor** (agent + inline edits) as the day-to-day coding environment, driving an Anthropic Claude / OpenAI GPT model. `[FILL IN: name the exact model(s) you drove Cursor with most, e.g. Claude Sonnet/Opus, and roughly the split.]`
+- **Primary tool: Cursor** (agent + inline edits) as the day-to-day coding environment, driving primarily **Claude Opus 4.8** and **Cursor's Composer 2.5** model.
 - **How I used it (the actual loop):**
   1. **Plan in Markdown first, code second.** I wrote decision docs (`prd.md`, `PHASE2-AI-NOTES.md`, `PHASE3-LEARNING-SCIENCE.md`) and used them as durable context I could point the agent at, rather than re-explaining intent every prompt. This kept the agent grounded across long sessions.
   2. **Schema-first, then fill in.** I had the agent define the typed content model (`types/content.ts`) and the deterministic domain math (`lib/dtm.ts`, `lib/validators.ts`) before any AI features, so the AI layer had a verifiable substrate to sit on.
@@ -616,21 +616,23 @@ The purpose of this BrainLift is to develop a rigorous, defensible point of view
 
 ### 2. Prompting strategies
 
-A few patterns that consistently worked. Exact transcripts are mine to paste in for the final.
+Real prompts from the build (lightly cleaned). Each shows a pattern that worked; three of the four are about building the interactive lessons themselves.
 
-**a) "Build the verifiable substrate before the AI."** I prompted the agent to implement the domain as pure functions (`stageFromRates`, `trendFromGap`, `dominantSector`, `malthusCrossover`, `computeDensities`) plus outcome-based validators *first*, explicitly so AI output could later be checked against them. This single decision is what made the skill-check feature safe.
-> `[FILL IN: paste the actual prompt you used to scaffold dtm.ts / validators.ts.]`
+**a) Point the agent at the docs, not just the code.** Before touching lessons, I had the agent read the research + lesson-structure notes and do gap analysis against the AP CED, so its suggestions were curriculum-grounded rather than generic.
+> *"Analyze the docs in this folder regarding AP Human Geo content and the planned lesson structure. Remember the current focus is Unit 2 content specifically. Analyze the 6 lessons in use and any gaps where necessary APHG Unit 2 content is missing, and how it can be inserted — either through extra slides in a lesson or one or more extra lessons entirely."*
 
-**b) "Generate as data, not as UI."** To build interactive lessons, I prompted for **typed `Step` objects** (interaction config + answer + outcome-keyed feedback) rather than React components, e.g. *"Author lesson 1 as an array of `Step` objects matching the `Lesson` schema; every wrong-answer outcome must have hand-written feedback tied to a specific misconception — never just 'incorrect'."* The data-driven model let me mass-produce and review lesson variations cheaply.
-> `[FILL IN: paste the actual lesson-authoring prompt + one Step it produced.]`
+**b) Decide out loud, then lock it into the doc.** I reasoned through lesson boundaries in the prompt itself and told the agent to record only the *decided* changes in the lesson-structure doc and defer the open ones — so the markdown doc became the durable plan the build followed.
+> *"I think 2.7 (population policy) fits better into Lesson 3 (epi transition) — replace slides 7 and 8 with a learn, then an explore, and maybe a match/question after (≈11 slides total); scope that into the lesson-structure doc. Malthusian theory doesn't fit the model-break lesson — it's a separate food model, so it's either its own lesson or excluded; investigate how much content there is and the potential for an explore/questions. If migration moves into a 'why people move' lesson, Lesson 5 no longer justifies itself (the previous lesson already covers pyramid anomalies), so replace it with the why-people-move lesson, reusing the old Lesson 5 while adding chain/step migration, intervening obstacles, internal/international, and going deeper on refugees… Note all the locked-in changes to the lesson-structure doc; hold off on the stuff still being decided."*
 
-**c) "Constrain the LLM to templates + force structured output."** For AI question generation I prompted the model to emit only from a fixed template set with a structured `scenario` object *"so the answer can be independently recomputed"* — and to return strict JSON. This is what turned a hallucination-prone generator into a verifiable one (see `features/skillCheck.ts`).
-> `[FILL IN: paste the skill-check generation prompt, or cite the SKILL_CHECK_TASK string in the repo.]`
+This prompt drove the actual restructure: population policy folded into L3, the new "Limits of Growth" (Malthus + density) lesson, and migration graduating into its own "Why People Move" lesson.
 
-**d) "Critique their attempt, don't reveal the answer."** For the wrong-answer nudge, the prompt grounds the model in the learner's *actual* serialized state + validator outcome and instructs it to critique the specific mistake in 1–2 sentences *"without stating the correct answer, stage number, option label, or target values."* Paired with a deterministic post-filter (`hintGuard.ts`) that rejects any leak.
-> `[FILL IN: optional — paste a real nudge the model produced for a wrong answer.]`
+**c) Author interactive steps with the pedagogical judgment baked in.** I specified the exact interaction *and* overrode a content choice the model would otherwise have made.
+> *"For slide 9 of that lesson, make it an explore focused on the United States food-vs-population curve, with a timeline showing the policies/innovations along it. For the last 'explain it back' slide, don't use neo-Malthusian since there's no pre-context for it — just have them pick a modern finite resource and what could prevent the crisis."*
 
-**e) `[FILL IN: one more prompt that genuinely surprised you — e.g. a debugging prompt, a refactor, or how you got the agent to wire the provider-agnostic AI layer.]`**
+The agent generated the typed step; I made the teaching call (don't introduce a term the lesson never set up).
+
+**d) Build a whole feature with the constraint stated up front.** Putting the privacy rule in the prompt meant the agent built the feature and its data-scoping guard together.
+> *"Flesh out the home page: add a navbar (main page, leaderboard, account page with a name setter and icon selector that also shows on the main page, plus delete-account + sign-out). Make the leaderboard a streak leaderboard and seed fake accounts alongside real ones — and make sure no sensitive account data beyond name + icon + streak is shown or accessible there. On the main page, show stats like mastery percent and mastered/completed/not-started."*
 
 ### 3. Phase decisions
 
@@ -671,7 +673,7 @@ The Phase 3 design intent (from `PHASE3-LEARNING-SCIENCE.md`) points AI's conten
 
 ### 4. Code analysis (AI-generated vs hand-written)
 
-Rough split: **`[FILL IN: e.g. ~80%]` AI-generated, `[FILL IN: e.g. ~20%]` hand-written / hand-directed.** *(Replace with your real estimate — you can sanity-check with `git` line counts.)*
+Rough split: **~90% AI-generated, ~10% hand-written / hand-directed.**
 
 What that split actually looks like in practice:
 
@@ -687,7 +689,7 @@ The honest framing: **AI wrote most of the lines; I made the load-bearing decisi
 - **Refusing AI features is a design skill.** Skipping the chatbot tutor and LLM path-reordering made the product *better*, not lazier. The seductive, ungrounded features are exactly the ones to cut.
 - **"Correct but not yet sharp" beats "sharp but possibly wrong."** For the checkpoint I shipped verified-but-plain questions rather than fluent ones I couldn't guarantee. In education a confident wrong answer teaches a misconception — the most expensive bug there is.
 - **Optimize for retention, distrust engagement.** Engagement and time-on-task are not learning. Designing the AI around retrieval/spacing/interleaving (and *against* engagement theater) is the contrarian-but-correct bet.
-- `[FILL IN: one personal spiky take — e.g. something surprising about how the agent behaved, or a belief this project changed for you.]`
+- **AI in education shouldn't operate autonomously at scale (my SPOV #2).** Every AI feature here is small-scoped, grounded in structured state, and verified — by deterministic logic or by independent-solver consensus — before a learner ever sees it, never a free-roaming model deciding what's true. In education the hallucination risk isn't an edge to smooth over later; it's the constraint the whole architecture is built around.
 
 ---
 

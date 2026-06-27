@@ -37,10 +37,16 @@ function struggleDetail(step: Step, progress?: LessonProgress): string | null {
   return parts.join('; ');
 }
 
-/** Structured performance log for skill-check generation (not shown to the learner). */
+const DEFAULT_SKILL_CHECK_DIRECTIVE =
+  'Write 3 AP-exam-level MCQs (application/analysis, not recall) with extra weight on the struggled concepts/steps above. Re-test misconceptions the learner showed, using fresh real-world scenarios. Do not reuse lesson step prompts verbatim.';
+
+/** Structured performance log for skill-check generation (not shown to the learner).
+ *  Pass a custom `directive` to override the closing instruction (e.g. the
+ *  qualitative generator supplies its own, count-agnostic directive). */
 export function buildSkillCheckLearnerContext(
   lesson: Lesson,
   progress?: LessonProgress,
+  directive: string = DEFAULT_SKILL_CHECK_DIRECTIVE,
 ): string {
   const concepts = [...new Set(lesson.steps.flatMap((s) => s.concepts ?? []))];
   const reviewIds = stepsNeedingReview(progress);
@@ -77,10 +83,7 @@ export function buildSkillCheckLearnerContext(
     blocks.push('', 'No graded step performance recorded yet.');
   }
 
-  blocks.push(
-    '',
-    'Write 3 AP-exam-level MCQs (application/analysis, not recall) with extra weight on the struggled concepts/steps above. Re-test misconceptions the learner showed, using fresh real-world scenarios. Do not reuse lesson step prompts verbatim.',
-  );
+  if (directive) blocks.push('', directive);
 
   return blocks.join('\n');
 }

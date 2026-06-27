@@ -14,6 +14,7 @@ export const whyPeopleMove: Lesson = {
   subtitle: 'Push, pull, and the obstacles in the way',
   concept:
     'Migration is the third force on population — the one the DTM ignores. People move for reasons (push/pull, sorted into economic, political, environmental, and social factors) with varying freedom (forced/voluntary). Intervening obstacles and opportunities bend the journey, most migrants travel only as far as they must (distance decay), and migration reshapes both the place left and the place joined.',
+  cedTopics: ['2.10', '2.11', '2.12'],
   order: 6,
   prerequisites: ['population-structure'],
   steps: [
@@ -223,11 +224,12 @@ export const whyPeopleMove: Lesson = {
         config: {
           instruction: 'Drag each scenario onto the migration type it best fits.',
           tiles: [
-            { id: 'step', label: 'A worker moves from a village to a town, then years later to the capital' },
             { id: 'chain', label: 'A woman emigrates to the country where her brother already settled' },
-            { id: 'internal', label: 'A family moves from the countryside to a city in the same country' },
-            { id: 'international', label: 'An engineer relocates permanently from India to Canada' },
             { id: 'guest', label: 'Construction workers take a multi-year Gulf contract and send wages home' },
+            { id: 'internal', label: 'A family moves from the countryside to a city in the same country' },
+            { id: 'step', label: 'A worker moves from a village to a town, then years later to the capital' },
+            { id: 'international', label: 'An engineer relocates permanently from India to Canada' },
+            
           ],
           slots: [
             { id: 'step-slot', label: 'Step migration', icon: '🪜' },
@@ -383,12 +385,12 @@ export const whyPeopleMove: Lesson = {
           instruction: 'Drag each effect into the bucket it belongs to. Each bucket holds several effects.',
           multiPerSlot: true,
           tiles: [
+            { id: 'male-bulge', label: 'A bulge of young working-age men appears in the pyramid', icon: '📊' },
             { id: 'remittances', label: 'Workers send money back to their families', icon: '💸' },
+            { id: 'cultural', label: 'New languages, foods, and religions add diversity', icon: '🌐' },
+            { id: 'labor-supply', label: 'A boost in working-age labor fills job shortages', icon: '💪' },
             { id: 'brain-drain', label: 'Skilled doctors and engineers leave, draining talent', icon: '🧠' },
             { id: 'aging-left', label: 'Young adults gone, leaving an older population behind', icon: '👵' },
-            { id: 'labor-supply', label: 'A boost in working-age labor fills job shortages', icon: '💪' },
-            { id: 'cultural', label: 'New languages, foods, and religions add diversity', icon: '🌐' },
-            { id: 'male-bulge', label: 'A bulge of young working-age men appears in the pyramid', icon: '📊' },
           ],
           slots: [
             { id: 'origin', label: 'Origin', icon: '📤', sublabel: 'The place left' },
@@ -445,14 +447,14 @@ export const whyPeopleMove: Lesson = {
       },
     },
     {
-      id: 'connect-uae-dtm',
-      kind: 'connect',
+      id: 'explore-uae-dtm',
+      kind: 'explore',
       prompt:
         'Back to the model. Compare the textbook DTM path to the UAE. Drag the year — both charts move together. What drove the boom?',
       concept:
         "The UAE's population tripled with only moderate birth rates. The textbook DTM, which tracks only births and deaths, cannot explain that boom — it came from labor migration, the exact force the model leaves out.",
       concepts: ['migration', 'dtm-critique'],
-      difficulty: 2,
+      difficulty: 1,
       interaction: {
         type: 'country-model',
         config: {
@@ -463,10 +465,8 @@ export const whyPeopleMove: Lesson = {
         },
       },
       feedback: {
-        correct:
+        onExplore:
           'See the gap: the textbook curve (left) predicts steady, birth-and-death-driven growth, but the UAE (right) exploded far faster while birth rates stayed only moderate. That extra growth is net migration — millions of foreign workers — and it is exactly the third force the DTM ignores. Migration, not births or deaths, drove the boom.',
-        incorrect:
-          'Scrub the year and compare the two charts, then check again.',
       },
     },
   ],

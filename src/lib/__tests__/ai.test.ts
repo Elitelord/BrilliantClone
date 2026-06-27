@@ -1,10 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { hintLeaksAnswer, safeAuthoredHint } from '../ai/hintGuard';
 import { normalizeHintResponse, parseAiJson } from '../ai/parseJson';
-import { normalizeSkillCheckBatch } from '../ai/features/skillCheck';
+import { normalizeSkillCheckBatch, selectSkillCheckMix } from '../ai/features/skillCheck';
 import { playableSteps } from '../ai/lessonSteps';
 import { verifySkillCheckQuestion, skillCheckTemplatesForLesson } from '../ai/verify';
+import {
+  solverAgreementPasses,
+  normalizeQualitativeBatch,
+  normalizeSolverAnswer,
+} from '../ai/features/qualitativeCheck';
 import type { Lesson, Step } from '../../types/content';
+import type { VerifiedSkillCheckQuestion } from '../ai/verify';
 
 describe('parseAiJson', () => {
   it('strips markdown fences and parses object', () => {
@@ -368,5 +374,261 @@ describe('skillCheckTemplatesForLesson', () => {
   it('falls back to core rate templates when nothing matches', () => {
     const t = skillCheckTemplatesForLesson(lessonWith(['mystery-concept']));
     expect(t).toEqual(['stage-from-rates', 'population-trend']);
+  });
+});
+
+describe('verifySkillCheckQuestion doubling-time', () => {
+  it('matches the option equal to the Rule-of-70 doubling time', () => {
+    // NIR = (40 − 20)/10 = 2.0% → doubling ≈ 70/2 = 35 years.
+    const q = {
+      template: 'doubling-time' as const,
+      prompt: 'A country has CBR 40 and CDR 20. About how long until its population doubles?',
+      scenario: { cbr: 40, cdr: 20 },
+      options: [
+        { id: 'a', label: '≈ 18 years' },
+        { id: 'b', label: '≈ 35 years' },
+        { id: 'c', label: '≈ 70 years' },
+        { id: 'd', label: '≈ 140 years' },
+      ],
+      claimedCorrectId: 'b',
+      explanation: 'Rule of 70: 70 ÷ 2.0% ≈ 35 years.',
+    };
+    expect(verifySkillCheckQuestion(q)?.correctId).toBe('b');
+  });
+
+  it('discards when no option is near the true doubling time', () => {
+    const q = {
+      template: 'doubling-time' as const,
+      prompt: 'CBR 40, CDR 20 — doubling time?',
+      scenario: { cbr: 40, cdr: 20 }, // true ≈ 35 years
+      options: [
+        { id: 'a', label: '≈ 70 years' },
+        { id: 'b', label: '≈ 100 years' },
+        { id: 'c', label: '≈ 120 years' },
+        { id: 'd', label: '≈ 140 years' },
+      ],
+      claimedCorrectId: 'a',
+      explanation: 'No correct option present.',
+    };
+    expect(verifySkillCheckQuestion(q)).toBeNull();
+  });
+});
+
+describe('verifySkillCheckQuestion dependency-ratio', () => {
+  it('matches the option equal to (youth + elderly) / working × 100', () => {
+    // (40 + 20) / 100 × 100 = 60.
+    const q = {
+      template: 'dependency-ratio' as const,
+      prompt: 'A country has 40M children, 100M working-age, and 20M elderly. Its total dependency ratio?',
+      scenario: { youth: 40, working: 100, elderly: 20 },
+      options: [
+        { id: 'a', label: '≈ 30' },
+        { id: 'b', label: '≈ 45' },
+        { id: 'c', label: '≈ 60' },
+        { id: 'd', label: '≈ 90' },
+      ],
+      claimedCorrectId: 'c',
+      explanation: '60 dependents per 100 working-age.',
+    };
+    expect(verifySkillCheckQuestion(q)?.correctId).toBe('c');
+  });
+
+  it('uses the recomputed ratio even when the claimed id is wrong', () => {
+    const q = {
+      template: 'dependency-ratio' as const,
+      prompt: 'Dependency ratio?',
+      scenario: { youth: 40, working: 100, elderly: 20 },
+      options: [
+        { id: 'a', label: '≈ 30' },
+        { id: 'b', label: '≈ 45' },
+        { id: 'c', label: '≈ 60' },
+        { id: 'd', label: '≈ 90' },
+      ],
+      claimedCorrectId: 'a',
+      explanation: 'Wrong claim, right logic.',
+    };
+    expect(verifySkillCheckQuestion(q)?.correctId).toBe('c');
+  });
+});
+
+describe('verifySkillCheckQuestion replacement-level', () => {
+  const opts = [
+    { id: 'a', label: 'Growing over the long run' },
+    { id: 'b', label: 'Rapid, explosive growth' },
+    { id: 'c', label: 'Roughly stable' },
+    { id: 'd', label: 'Shrinking — long-run decline' },
+  ];
+  it('maps a below-replacement TFR to long-run decline', () => {
+    const q = {
+      template: 'replacement-level' as const,
+      prompt: 'A country’s TFR has fallen to 1.3 and stays there. Long-run trajectory (ignoring migration)?',
+      scenario: { tfr: 1.3 },
+      options: opts,
+      claimedCorrectId: 'd',
+      explanation: 'Below replacement → eventual decline.',
+    };
+    expect(verifySkillCheckQuestion(q)?.correctId).toBe('d');
+  });
+  it('maps an above-replacement TFR to growth', () => {
+    const q = {
+      template: 'replacement-level' as const,
+      prompt: 'TFR 3.8, sustained. Long-run trajectory?',
+      scenario: { tfr: 3.8 },
+      options: opts,
+      claimedCorrectId: 'a',
+      explanation: 'Above replacement → growth.',
+    };
+    expect(verifySkillCheckQuestion(q)?.correctId).toBe('a');
+  });
+  it('maps a replacement-level TFR to stable', () => {
+    const q = {
+      template: 'replacement-level' as const,
+      prompt: 'TFR 2.1, sustained. Long-run trajectory?',
+      scenario: { tfr: 2.1 },
+      options: opts,
+      claimedCorrectId: 'c',
+      explanation: 'At replacement → stable.',
+    };
+    expect(verifySkillCheckQuestion(q)?.correctId).toBe('c');
+  });
+});
+
+describe('skillCheckTemplatesForLesson by CED topic', () => {
+  const lessonWithTopics = (cedTopics: string[]): Lesson =>
+    ({
+      id: 'x',
+      courseId: 'dtm',
+      title: 'X',
+      concept: '',
+      cedTopics,
+      order: 1,
+      prerequisites: [],
+      steps: [
+        { id: 's', kind: 'predict', prompt: 'p', interaction: { type: 'stage-select', config: {} }, concepts: [], feedback: {} },
+      ],
+    }) as Lesson;
+
+  it('maps topic 2.4 to doubling-time and replacement-level', () => {
+    const t = skillCheckTemplatesForLesson(lessonWithTopics(['2.4']));
+    expect(t).toContain('doubling-time');
+    expect(t).toContain('replacement-level');
+  });
+
+  it('maps composition/aging topics to dependency-ratio and pyramid-stage', () => {
+    const t = skillCheckTemplatesForLesson(lessonWithTopics(['2.3', '2.9']));
+    expect(t).toContain('dependency-ratio');
+    expect(t).toContain('pyramid-stage');
+  });
+});
+
+describe('solverAgreementPasses', () => {
+  const ans = (chosenId: string, ambiguous = false) => ({ chosenId, reasoning: '', ambiguous });
+  it('passes when both solvers agree and neither flags ambiguity', () => {
+    expect(solverAgreementPasses('b', [ans('b'), ans('b')])).toBe(true);
+  });
+  it('fails when a solver disagrees', () => {
+    expect(solverAgreementPasses('b', [ans('b'), ans('c')])).toBe(false);
+  });
+  it('fails when a solver flags ambiguity', () => {
+    expect(solverAgreementPasses('b', [ans('b'), ans('b', true)])).toBe(false);
+  });
+  it('fails when fewer than the required number of solvers answered', () => {
+    expect(solverAgreementPasses('b', [ans('b'), null])).toBe(false);
+  });
+});
+
+describe('normalizeSolverAnswer', () => {
+  it('normalizes a letter id and ambiguity flag', () => {
+    expect(normalizeSolverAnswer({ chosenId: 'B', reasoning: 'r', ambiguous: false })).toEqual({
+      chosenId: 'b',
+      reasoning: 'r',
+      ambiguous: false,
+    });
+  });
+  it('extracts the letter from "Option C"', () => {
+    expect(normalizeSolverAnswer({ chosenId: 'Option C' })?.chosenId).toBe('c');
+  });
+  it('returns null when no a–d id is present', () => {
+    expect(normalizeSolverAnswer({ reasoning: 'no choice given' })).toBeNull();
+    expect(normalizeSolverAnswer(null)).toBeNull();
+  });
+});
+
+describe('normalizeQualitativeBatch', () => {
+  it('coerces a questions array with string options and a letter answer', () => {
+    const batch = normalizeQualitativeBatch({
+      questions: [
+        {
+          cedTopic: '2.6',
+          prompt: 'Which BEST explains why Malthus’s predicted catastrophe was averted?',
+          options: [
+            'Agricultural innovation raised food output',
+            'Population growth stopped instantly',
+            'Food supply grew exponentially',
+            'Arable land expanded without limit',
+          ],
+          claimedCorrectId: 'a',
+          explanation: 'Innovation lifted the food line.',
+        },
+        { prompt: 'too few options', options: ['only', 'three', 'here'], claimedCorrectId: 'a' },
+      ],
+    });
+    expect(batch?.length).toBe(1);
+    expect(batch?.[0].options.map((o) => o.id)).toEqual(['a', 'b', 'c', 'd']);
+    expect(batch?.[0].cedTopic).toBe('2.6');
+    expect(batch?.[0].claimedCorrectId).toBe('a');
+  });
+
+  it('maps a claimed id that references an original option id onto a–d', () => {
+    const batch = normalizeQualitativeBatch([
+      {
+        cedTopic: '2.5',
+        prompt: 'Which scenario best fits Stage 2?',
+        options: [
+          { id: 'w', label: 'High births, plunging deaths' },
+          { id: 'x', label: 'Low births, low deaths' },
+          { id: 'y', label: 'Births below deaths' },
+          { id: 'z', label: 'High births, high deaths' },
+        ],
+        claimedCorrectId: 'w',
+        explanation: 'Deaths fall first.',
+      },
+    ]);
+    expect(batch?.[0].options.map((o) => o.id)).toEqual(['a', 'b', 'c', 'd']);
+    expect(batch?.[0].claimedCorrectId).toBe('a'); // 'w' → position 0 → 'a'
+  });
+});
+
+describe('selectSkillCheckMix', () => {
+  const vq = (id: string): VerifiedSkillCheckQuestion => ({
+    prompt: `Q ${id}`,
+    options: [
+      { id: 'a', label: 'a' },
+      { id: 'b', label: 'b' },
+      { id: 'c', label: 'c' },
+      { id: 'd', label: 'd' },
+    ],
+    correctId: 'a',
+    explanation: 'x',
+    template: 'qualitative',
+  });
+  const comp = [vq('c0'), vq('c1'), vq('c2')];
+  const qual = [vq('q0'), vq('q1'), vq('q2'), vq('q3')];
+
+  it('prefers 2 qualitative + 1 computational', () => {
+    expect(selectSkillCheckMix([comp[0]], [qual[0], qual[1]]).map((q) => q.prompt)).toEqual([
+      'Q q0',
+      'Q q1',
+      'Q c0',
+    ]);
+  });
+  it('fills with computational when qualitative is short', () => {
+    expect(selectSkillCheckMix(comp, [qual[0]]).map((q) => q.prompt)).toEqual(['Q q0', 'Q c0', 'Q c1']);
+  });
+  it('backfills with leftover qualitative when no computational survived', () => {
+    expect(selectSkillCheckMix([], qual).map((q) => q.prompt)).toEqual(['Q q0', 'Q q1', 'Q q2']);
+  });
+  it('returns empty when nothing verified', () => {
+    expect(selectSkillCheckMix([], [])).toEqual([]);
   });
 });

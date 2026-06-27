@@ -7,6 +7,9 @@ import {
   dominantSector,
   computeDensities,
   malthusCrossover,
+  nirPercent,
+  doublingTime,
+  dependencyRatioFromBands,
   TREND_LABEL,
   stageName,
   SECTOR_LABEL,
@@ -21,7 +24,13 @@ export type SkillCheckTemplate =
   | 'cause-of-death'
   | 'net-migration'
   | 'density-measure'
-  | 'malthus-outcome';
+  | 'malthus-outcome'
+  | 'doubling-time'
+  | 'dependency-ratio'
+  | 'replacement-level'
+  // Qualitative reasoning questions — verified by independent-solver agreement
+  // (see features/qualitativeCheck.ts), NOT by deterministic recompute.
+  | 'qualitative';
 
 export type DensityType = 'arithmetic' | 'physiological' | 'agricultural';
 
@@ -49,6 +58,12 @@ export interface SkillCheckScenario {
   growthRate?: number; // population growth, % per year
   foodSlope?: number; // food units added per year (linear)
   horizon?: number; // years to project
+  // dependency-ratio: absolute populations in any consistent unit
+  youth?: number; // aged 0–14
+  working?: number; // aged 15–64
+  elderly?: number; // aged 65+
+  // replacement-level
+  tfr?: number; // total fertility rate (lifetime children per woman)
 }
 
 function readNum(v: unknown): number | undefined {
@@ -121,6 +136,10 @@ export function normalizeSkillCheckScenario(raw: unknown): SkillCheckScenario {
     growthRate: pick(['growthRate', 'populationGrowth', 'growthPct', 'growthPercent', 'popGrowthRate']),
     foodSlope: pick(['foodSlope', 'foodGrowth', 'foodIncrease', 'foodRate']),
     horizon: pick(['horizon', 'years', 'timeHorizon', 'projectionYears']),
+    youth: pick(['youth', 'young', 'youthPopulation', 'under15', 'age0to14', 'population0to14']),
+    working: pick(['working', 'workingAge', 'workingPopulation', 'age15to64', 'laborForce']),
+    elderly: pick(['elderly', 'old', 'elderlyPopulation', 'over65', 'age65plus', 'seniors']),
+    tfr: pick(['tfr', 'TFR', 'totalFertilityRate', 'fertilityRate', 'fertility']),
   };
 }
 
@@ -162,6 +181,18 @@ export function normalizeSkillCheckTemplate(raw: unknown): SkillCheckTemplate | 
     malthus: 'malthus-outcome',
     'malthusian-theory': 'malthus-outcome',
     'carrying-capacity': 'malthus-outcome',
+    'doubling-time': 'doubling-time',
+    doublingtime: 'doubling-time',
+    doubling: 'doubling-time',
+    'rule-of-70': 'doubling-time',
+    'dependency-ratio': 'dependency-ratio',
+    dependencyratio: 'dependency-ratio',
+    dependency: 'dependency-ratio',
+    'age-dependency': 'dependency-ratio',
+    'replacement-level': 'replacement-level',
+    replacementlevel: 'replacement-level',
+    replacement: 'replacement-level',
+    'tfr-replacement': 'replacement-level',
   };
   return aliases[key] ?? null;
 }
@@ -411,6 +442,26 @@ export function computeCorrectOptionId(q: RawSkillCheckQuestion): string | null 
       });
       return findOptionForMalthus(options, crosses);
     }
+    case 'doubling-time': {
+      if (scenario.cbr == null || scenario.cdr == null) return null;
+      const years = doublingTime(nirPercent(scenario.cbr - scenario.cdr));
+      if (years == null) return null; // not growing → Rule of 70 inapplicable
+      return findOptionForNumber(options, years);
+    }
+    case 'dependency-ratio': {
+      if (scenario.youth == null || scenario.working == null || scenario.elderly == null) {
+        return null;
+      }
+      const ratio = dependencyRatioFromBands(scenario.youth, scenario.working, scenario.elderly);
+      if (!Number.isFinite(ratio) || ratio <= 0) return null;
+      return findOptionForNumber(options, ratio);
+    }
+    case 'replacement-level': {
+      if (scenario.tfr == null) return null;
+      const trend: Trend =
+        scenario.tfr <= 2.0 ? 'shrinking' : scenario.tfr >= 2.2 ? 'growing' : 'stable';
+      return findOptionForTrend(options, trend);
+    }
     default:
       return null;
   }
@@ -442,6 +493,27 @@ export function skillCheckTemplatesForLesson(lesson: Lesson): SkillCheckTemplate
     out.add('stage-from-rates');
     out.add('population-trend');
   }
+
+  // Also key off the lesson's CED topic codes (more reliable than concept-tag regex).
+  const topics = new Set(lesson.cedTopics ?? []);
+  const hasTopic = (...codes: string[]) => codes.some((c) => topics.has(c));
+  if (hasTopic('2.3', '2.9')) {
+    out.add('pyramid-stage');
+    out.add('dependency-ratio');
+  }
+  if (hasTopic('2.2')) out.add('density-measure');
+  if (hasTopic('2.6')) out.add('malthus-outcome');
+  if (hasTopic('2.10', '2.11', '2.12')) out.add('net-migration');
+  if (hasTopic('2.5')) out.add('cause-of-death');
+  if (hasTopic('2.4')) out.add('doubling-time');
+  if (hasTopic('2.4', '2.8')) out.add('replacement-level');
+  if (hasTopic('2.4', '2.5', '2.7', '2.8')) {
+    out.add('stage-from-rates');
+    out.add('population-trend');
+  }
+  if (/dependency/.test(tags)) out.add('dependency-ratio');
+  if (/doubling/.test(tags)) out.add('doubling-time');
+  if (/tfr|replacement|fertility/.test(tags)) out.add('replacement-level');
 
   if (out.size === 0) {
     out.add('stage-from-rates');

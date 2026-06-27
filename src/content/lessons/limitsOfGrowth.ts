@@ -14,6 +14,7 @@ export const limitsOfGrowth: Lesson = {
   subtitle: 'Density, carrying capacity, and whether the boom can outrun its food',
   concept:
     'People crowd onto the small share of land that can feed them, so "people per country" hides the real pressure — physiological and agricultural density reveal it. Malthus predicted exponential population would outrun linear food and trigger a crisis. It mostly did not: more food (Boserup, the Green Revolution) and the Lesson 3 fertility decline bent the curves apart. The same logic still raises worries today about water, energy, and climate.',
+  cedTopics: ['2.2', '2.6'],
   order: 4,
   prerequisites: ['dtm-engine', 'epi-transition'],
   steps: [

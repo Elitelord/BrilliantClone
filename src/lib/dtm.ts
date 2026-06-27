@@ -430,6 +430,13 @@ export function dependencyBreakdownFromCohorts(
   return dependencyBreakdownFromWidths(cohorts);
 }
 
+/** Total dependency ratio from absolute age-band populations (any consistent unit):
+ *  (youth 0–14 + elderly 65+) ÷ working-age (15–64) × 100. */
+export function dependencyRatioFromBands(youth: number, working: number, elderly: number): number {
+  if (working <= 0) return 0;
+  return ((youth + elderly) / working) * 100;
+}
+
 // ---- Pyramid anomaly presets (explicit 9-cohort widths) ------------------
 export interface AnomalyPyramidPreset {
   id: string;

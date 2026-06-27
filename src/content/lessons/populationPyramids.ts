@@ -7,6 +7,7 @@ export const populationPyramids: Lesson = {
   title: 'Reading Population Pyramids',
   subtitle: 'How a country\'s shape tells its story',
   concept: 'A population pyramid\'s shape reveals its DTM stage: wide base = high births, column = stable, top-heavy = decline.',
+  cedTopics: ['2.3'],
   order: 2,
   prerequisites: ['dtm-engine'],
   steps: [

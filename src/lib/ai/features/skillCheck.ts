@@ -1,6 +1,8 @@
 import { generateJson } from '../generate';
 import { skillCheckBatchSchema } from '../schema';
 import { buildSkillCheckLearnerContext } from '../skillCheckContext';
+import { cedTopicsText } from '../../ced/unit2';
+import { generateQualitativeQuestions, verifyBySolverAgreement } from './qualitativeCheck';
 import {
   verifySkillCheckQuestion,
   normalizeSkillCheckScenario,
@@ -15,7 +17,7 @@ import type { LessonProgress, MasteryRecord } from '../../../types/progress';
 import type { McOption } from '../../../types/content';
 
 const SKILL_CHECK_SYSTEM_INSTRUCTION = [
-  'You are an experienced AP Human Geography exam item writer creating stimulus-based multiple-choice questions for Unit 2 (Population & Migration), focused on the Demographic Transition Model.',
+  'You are an experienced AP Human Geography exam item writer creating stimulus-based multiple-choice questions for Unit 2: Population & Migration, scoped to the specific CED subunit(s) named in the prompt.',
   'Write at genuine AP exam difficulty: every question must require APPLICATION or ANALYSIS, never bare recall.',
   'Mirror College Board style: a concrete real-world stimulus (a named or described country/region with data), an AP command phrasing ("which of the following BEST explains", "is most strongly supported by", "would most likely result in"), and four plausible options.',
   'Distractors must be genuinely tempting — each should encode a specific, common student misconception, not an obviously wrong throwaway.',
@@ -42,6 +44,9 @@ const SKILL_CHECK_TASK = [
   '- net-migration: scenario MUST include numeric cbr, cdr, and netMigration (net migration rate per 1,000, negative for net emigration); option labels MUST read as stable / growing / rapid growth / shrinking. Test how migration flips a country\'s overall population change versus its natural increase.',
   '- density-measure: scenario MUST use ABSOLUTE counts in consistent units — population (number of people), totalLand and arableLand (km²), farmers (number of people) — plus densityType ("arithmetic" | "physiological" | "agricultural"). The 4 option labels MUST be numeric "≈ N per km²" values, and one of them MUST equal the chosen density computed as people ÷ km² (arithmetic = population÷totalLand, physiological = population÷arableLand, agricultural = farmers÷arableLand). Test why physiological/agricultural density reveals pressure that arithmetic density hides.',
   '- malthus-outcome: scenario MUST include numeric pop0, food0, growthRate (population % per year), foodSlope (food units added per year), and horizon (years); option labels MUST clearly read as a Malthusian crisis/catastrophe vs a catastrophe averted/food keeps pace. Test whether exponential population outruns linear food.',
+  '- doubling-time: scenario MUST include numeric cbr and cdr with cbr > cdr (so NIR is positive). The 4 option labels MUST be numeric "≈ N years"; one MUST equal the Rule-of-70 doubling time = 70 ÷ ((cbr - cdr) / 10). Make the other three clearly different (e.g. the NIR value itself as years, or half/double the true time). Test the Rule of 70.',
+  '- dependency-ratio: scenario MUST include numeric youth (aged 0–14), working (aged 15–64), and elderly (aged 65+) population counts in consistent units. Each of the 4 option labels MUST contain exactly ONE number — the total dependency ratio, e.g. "≈ 72" (read as dependents per 100 working-age); one MUST equal (youth + elderly) ÷ working × 100, the other three clearly different. Do not put a second number (like "100") in a label.',
+  '- replacement-level: scenario MUST include a numeric tfr. The 4 option labels MUST clearly read as long-run trajectories: shrinking / stable / growing / rapid growth. The correct one follows from TFR vs replacement (≈ 2.1): clearly below → shrinking, about 2.1 → stable, clearly above → growing (ignore migration and momentum). Test replacement-level fertility reasoning.',
   '',
   'FORMAT: exactly 4 options per question with ids a,b,c,d and full descriptive labels (never just "A"). claimedCorrectId MUST be the id of the logically correct option. Keep the explanation to one sharp sentence that names the principle, not just the answer.',
   '',
@@ -239,15 +244,100 @@ export async function generateSkillCheck(
   }
 }
 
+const TOTAL_QUESTIONS = 3;
+const TARGET_QUALITATIVE = 2;
+/** Generate a few extra qualitative candidates so enough survive the agreement gate. */
+const QUALITATIVE_POOL = 4;
+
+/**
+ * Assemble the skill-check mix: take up to `targetQualitative` agreement-verified
+ * questions, fill the rest with formula-verified computational ones, then backfill
+ * from whichever pool still has spares. Pure and order-stable (easy to unit-test).
+ */
+export function selectSkillCheckMix(
+  computational: VerifiedSkillCheckQuestion[],
+  qualitative: VerifiedSkillCheckQuestion[],
+  opts: { total?: number; targetQualitative?: number } = {},
+): VerifiedSkillCheckQuestion[] {
+  const total = opts.total ?? TOTAL_QUESTIONS;
+  const targetQual = Math.min(opts.targetQualitative ?? TARGET_QUALITATIVE, total);
+  const out: VerifiedSkillCheckQuestion[] = [];
+  out.push(...qualitative.slice(0, targetQual));
+  for (const q of computational) {
+    if (out.length >= total) break;
+    out.push(q);
+  }
+  for (const q of qualitative.slice(targetQual)) {
+    if (out.length >= total) break;
+    out.push(q);
+  }
+  return out.slice(0, total);
+}
+
 async function generateSkillCheckInner(
   lesson: Lesson,
   mastery: Record<string, MasteryRecord>,
   progress?: LessonProgress,
 ): Promise<VerifiedSkillCheckQuestion[] | null> {
+  // Computational (formula-verified) and qualitative (agreement-verified)
+  // generation run concurrently to stay within the time budget.
+  const [computational, qualitative] = await Promise.all([
+    generateComputationalQuestions(lesson, mastery, progress),
+    generateVerifiedQualitative(lesson, progress),
+  ]);
+
+  const mix = selectSkillCheckMix(computational, qualitative);
+
+  if (mix.length === 0) {
+    console.warn('[skill-check] No verified questions; skipping.', { lessonId: lesson.id });
+    return null;
+  }
+  if (mix.length < TOTAL_QUESTIONS) {
+    console.warn('[skill-check] Shipping a short skill check.', {
+      lessonId: lesson.id,
+      count: mix.length,
+      computational: computational.length,
+      qualitative: qualitative.length,
+    });
+  }
+  return mix;
+}
+
+/** Generate a pool of qualitative candidates and keep those that pass solver agreement. */
+async function generateVerifiedQualitative(
+  lesson: Lesson,
+  progress?: LessonProgress,
+): Promise<VerifiedSkillCheckQuestion[]> {
+  const candidates = await generateQualitativeQuestions(lesson, progress, QUALITATIVE_POOL);
+  if (!candidates.length) return [];
+  const verified = await Promise.all(candidates.map((q) => verifyBySolverAgreement(q)));
+  const passed = verified.filter((q): q is VerifiedSkillCheckQuestion => q !== null);
+  if (passed.length < candidates.length) {
+    console.warn('[skill-check] Some qualitative questions failed solver agreement.', {
+      lessonId: lesson.id,
+      candidates: candidates.length,
+      passed: passed.length,
+    });
+  }
+  return passed;
+}
+
+/** Generate + formula-verify computational questions. Returns the best verified set (may be empty). */
+async function generateComputationalQuestions(
+  lesson: Lesson,
+  mastery: Record<string, MasteryRecord>,
+  progress?: LessonProgress,
+): Promise<VerifiedSkillCheckQuestion[]> {
   const concepts = [...new Set(lesson.steps.flatMap((s) => s.concepts ?? []))];
   const allowedTemplates = skillCheckTemplatesForLesson(lesson);
+  const cedText = cedTopicsText(lesson.cedTopics ?? []);
+  const cedBlock = cedText
+    ? `CED SUBUNIT(S) THIS LESSON COVERS — every question MUST assess one of these and must NOT drift to other units or topics:\n${cedText}`
+    : '';
   const prompt = [
     SKILL_CHECK_TASK,
+    '',
+    cedBlock,
     '',
     `ALLOWED TEMPLATES for this lesson (use ONLY these): ${allowedTemplates.join(', ')}.`,
     '',
@@ -260,6 +350,7 @@ async function generateSkillCheckInner(
     .filter(Boolean)
     .join('\n');
 
+  let best: VerifiedSkillCheckQuestion[] = [];
   for (let attempt = 0; attempt < 3; attempt++) {
     const raw = await generateJson<unknown>(prompt, skillCheckBatchSchema, {
       systemInstruction: SKILL_CHECK_SYSTEM_INSTRUCTION,
@@ -291,7 +382,7 @@ async function generateSkillCheckInner(
       .filter((q): q is VerifiedSkillCheckQuestion => q !== null);
 
     if (verified.length < normalized.length) {
-      console.warn('[skill-check] Some questions failed DTM verification.', {
+      console.warn('[skill-check] Some computational questions failed verification.', {
         attempt,
         lessonId: lesson.id,
         received: normalized.length,
@@ -307,13 +398,9 @@ async function generateSkillCheckInner(
       });
     }
 
-    if (verified.length === 3) return verified;
-    if (verified.length >= 2) {
-      console.warn('[skill-check] Using partial batch.', { lessonId: lesson.id, count: verified.length });
-      return verified;
-    }
+    if (verified.length > best.length) best = verified;
+    if (best.length >= 2) break; // enough for the mix + a fallback spare
   }
 
-  console.warn('[skill-check] Could not produce 3 verified questions; skipping.', { lessonId: lesson.id });
-  return null;
+  return best;
 }

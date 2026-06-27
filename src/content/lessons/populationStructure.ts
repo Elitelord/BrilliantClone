@@ -11,6 +11,7 @@ export const populationStructure: Lesson = {
   subtitle: 'Who depends, where growth is headed, and the marks events leave',
   concept:
     'A pyramid\'s shape reveals who depends on workers, whether growth has momentum, and the fingerprints wars, migration, and policy carve into age structure.',
+  cedTopics: ['2.3', '2.4', '2.9'],
   order: 5,
   prerequisites: ['population-pyramids'],
   steps: [

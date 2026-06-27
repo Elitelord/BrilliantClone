@@ -8,6 +8,7 @@ export const dtmEngine: Lesson = {
   title: 'The Engine of Growth',
   subtitle: 'Birth rates, death rates, and the gap between them',
   concept: 'Population change = birth rate − death rate. The size of that gap drives everything.',
+  cedTopics: ['2.4', '2.5'],
   order: 1,
   prerequisites: [],
   steps: [

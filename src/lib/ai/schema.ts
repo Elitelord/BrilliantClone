@@ -49,6 +49,12 @@ const skillCheckScenarioSchema = Schema.object({
     growthRate: Schema.number({ nullable: true }),
     foodSlope: Schema.number({ nullable: true }),
     horizon: Schema.number({ nullable: true }),
+    // dependency-ratio
+    youth: Schema.number({ nullable: true }),
+    working: Schema.number({ nullable: true }),
+    elderly: Schema.number({ nullable: true }),
+    // replacement-level
+    tfr: Schema.number({ nullable: true }),
   },
   optionalProperties: [
     'cbr',
@@ -69,6 +75,10 @@ const skillCheckScenarioSchema = Schema.object({
     'growthRate',
     'foodSlope',
     'horizon',
+    'youth',
+    'working',
+    'elderly',
+    'tfr',
   ],
 });
 
@@ -84,6 +94,9 @@ const skillCheckQuestionSchema = Schema.object({
         'net-migration',
         'density-measure',
         'malthus-outcome',
+        'doubling-time',
+        'dependency-ratio',
+        'replacement-level',
       ],
     }),
     prompt: Schema.string(),
@@ -97,5 +110,35 @@ const skillCheckQuestionSchema = Schema.object({
 export const skillCheckBatchSchema = Schema.object({
   properties: {
     questions: Schema.array({ items: skillCheckQuestionSchema, minItems: 3, maxItems: 3 }),
+  },
+});
+
+// ---- Qualitative (reasoning) skill-check questions ------------------------
+// No numeric scenario: these are trusted via independent-solver agreement
+// rather than deterministic recompute.
+const qualitativeQuestionSchema = Schema.object({
+  properties: {
+    cedTopic: Schema.string({ description: 'CED topic code this question assesses, e.g. "2.6".' }),
+    prompt: Schema.string(),
+    options: Schema.array({ items: skillCheckOptionSchema, minItems: 4, maxItems: 4 }),
+    claimedCorrectId: Schema.string(),
+    explanation: Schema.string(),
+  },
+});
+
+export const qualitativeCheckBatchSchema = Schema.object({
+  properties: {
+    questions: Schema.array({ items: qualitativeQuestionSchema, minItems: 1, maxItems: 6 }),
+  },
+});
+
+/** A single blind solver's answer to one question — the independent verifier. */
+export const solverAnswerSchema = Schema.object({
+  properties: {
+    chosenId: Schema.string({ description: 'The id (a, b, c, or d) of the single best option.' }),
+    reasoning: Schema.string({ description: 'One sentence justifying the choice.' }),
+    ambiguous: Schema.boolean({
+      description: 'True ONLY if two or more options are equally defensible, or the question is unclear.',
+    }),
   },
 });
