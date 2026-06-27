@@ -152,7 +152,7 @@ export const placeCountry: Lesson = {
       id: 'pick-all-stage-three',
       kind: 'solve',
       prompt: `Tap all ${STAGE_3_IDS.length} countries whose pyramid matches this shape — births falling, triangle narrowing.`,
-      concepts: ['synthesis', 'dtm-stages', 'population-pyramids'],
+      concepts: ['synthesis', 'dtm-stages', 'pyramid-classify'],
       difficulty: 3,
       reference: {
         type: 'population-pyramid',
@@ -178,7 +178,7 @@ export const placeCountry: Lesson = {
       id: 'pick-all-stage-four',
       kind: 'solve',
       prompt: `Tap all ${STAGE_4_IDS.length} countries whose pyramid matches this shape — low births, low deaths, near-stable column.`,
-      concepts: ['synthesis', 'dtm-stages', 'population-pyramids'],
+      concepts: ['synthesis', 'dtm-stages', 'pyramid-classify'],
       difficulty: 3,
       reference: {
         type: 'population-pyramid',

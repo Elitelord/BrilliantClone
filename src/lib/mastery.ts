@@ -1,5 +1,6 @@
 import type { Lesson } from '../types/content';
 import type { LessonProgress, MasteryRecord } from '../types/progress';
+import { computeNextDue, dueConcepts } from './scheduler';
 
 export const MASTERY_THRESHOLD = 60; // lesson score (%) to count as "mastered"
 export const REVIEW_WRONG_THRESHOLD = 2; // wrong attempts on a step -> surface review
@@ -71,13 +72,17 @@ export function stepsNeedingReview(progress?: LessonProgress): string[] {
 export interface Recommendation {
   lessonId: string;
   reason: string;
-  kind: 'continue' | 'next' | 'review' | 'done';
+  kind: 'continue' | 'next' | 'review' | 'mixed-review' | 'done';
 }
 
-// Pick a sensible next step across the ordered course.
+// Pick a sensible next step across the ordered course. When `masteryMap` is supplied
+// and every lesson is finished, a spaced "mixed review" of due concepts is preferred
+// over the bare "course complete" state (learning is recursive — see PHASE3 notes).
 export function recommendNext(
   orderedLessons: Lesson[],
   progressMap: Record<string, LessonProgress>,
+  masteryMap?: Record<string, MasteryRecord>,
+  now: number = Date.now(),
 ): Recommendation | null {
   // 1) An in-progress lesson takes priority (resume it).
   const inProgress = orderedLessons.find(
@@ -103,6 +108,18 @@ export function recommendNext(
     return { lessonId: next.id, reason: `Start "${next.title}"`, kind: 'next' };
   }
 
+  // 4) Everything is finished — surface spaced review if any concept is due.
+  if (masteryMap) {
+    const due = dueConcepts(masteryMap, now);
+    if (due.length > 0) {
+      return {
+        lessonId: '',
+        reason: `Review ${due.length} concept${due.length === 1 ? '' : 's'} due today`,
+        kind: 'mixed-review',
+      };
+    }
+  }
+
   return { lessonId: orderedLessons[0]?.id ?? '', reason: 'You have mastered the whole course!', kind: 'done' };
 }
 
@@ -112,6 +129,7 @@ export function updateMasteryForConcepts(
   correct: boolean,
 ): Record<string, MasteryRecord> {
   const next = { ...map };
+  const now = Date.now();
   for (const conceptId of conceptIds) {
     const prev = next[conceptId];
     const prevStrength = prev?.strength ?? 0;
@@ -121,9 +139,10 @@ export function updateMasteryForConcepts(
     next[conceptId] = {
       conceptId,
       strength,
-      lastSeen: Date.now(),
+      lastSeen: now,
       wrongCount: (prev?.wrongCount ?? 0) + (correct ? 0 : 1),
-      ...(prev?.nextDue !== undefined ? { nextDue: prev.nextDue } : {}),
+      // Phase 3: schedule the next spaced review (SM-2-lite). See lib/scheduler.ts.
+      nextDue: computeNextDue(prev, correct, now),
     };
   }
   return next;

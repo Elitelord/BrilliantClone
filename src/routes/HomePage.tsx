@@ -3,9 +3,12 @@ import { useAuthStore } from '../store/authStore';
 import { useProgressStore } from '../store/progressStore';
 import { getCourse, getOrderedLessons } from '../content';
 import { recommendNext } from '../lib/mastery';
+import { dueConcepts } from '../lib/scheduler';
+import { reviewedToday } from '../lib/review/dailyReview';
 import { goalMetToday } from '../lib/streak';
 import CoursePath from '../components/path/CoursePath';
 import CourseStats from '../components/home/CourseStats';
+import RetentionPanel from '../components/home/RetentionPanel';
 import StreakBadge from '../components/habit/StreakBadge';
 import Avatar from '../components/common/Avatar';
 import AppShell from '../components/layout/AppShell';
@@ -17,10 +20,14 @@ export default function HomePage() {
   const course = getCourse();
 
   const streak = data?.streak;
-  const rec = data ? recommendNext(getOrderedLessons(), data.progress) : null;
+  const now = Date.now();
+  const rec = data ? recommendNext(getOrderedLessons(), data.progress, data.mastery, now) : null;
+  const dueCount = data ? dueConcepts(data.mastery, now).length : 0;
+  const hasMastery = !!data && Object.keys(data.mastery).length > 0;
+  const didReviewToday = !!profile && reviewedToday(profile.uid);
 
   return (
-    <AppShell className="pb-28">
+    <AppShell maxWidth="max-w-2xl lg:max-w-4xl" className="pb-28">
       {/* header */}
       <header className="flex items-center justify-between py-5">
         <div className="flex items-center gap-3">
@@ -40,8 +47,8 @@ export default function HomePage() {
         {streak && <StreakBadge count={streak.count} goalMet={goalMetToday(streak)} />}
       </header>
 
-      {/* recommended next */}
-      {rec && (
+      {/* recommended next lesson */}
+      {rec && rec.kind !== 'mixed-review' && (
         <button
           type="button"
           onClick={() => rec.lessonId && navigate(`/lesson/${rec.lessonId}`)}
@@ -55,8 +62,36 @@ export default function HomePage() {
         </button>
       )}
 
-      {/* progress stats */}
-      <CourseStats />
+      {/* spaced review — surfaces whenever concepts are due */}
+      {dueCount > 0 && (
+        <button
+          type="button"
+          onClick={() => navigate('/review')}
+          className="mb-6 w-full rounded-3xl bg-gradient-to-br from-teal-600 to-teal-500 p-5 text-left text-white shadow-lg shadow-teal-600/20 active:scale-[0.99]"
+        >
+          <div className="text-xs font-semibold uppercase tracking-wide text-teal-100">
+            {didReviewToday ? 'Daily review · done today ✓' : 'Daily review'}
+          </div>
+          <div className="mt-1 text-lg font-bold">
+            {didReviewToday
+              ? `Reviewed today — ${dueCount} still due. A little each day beats cramming.`
+              : `${dueCount} concept${dueCount === 1 ? '' : 's'} due — keep them from fading`}
+          </div>
+          <div className="mt-3 inline-block rounded-full bg-white/20 px-3 py-1 text-sm font-semibold">
+            {didReviewToday ? 'Review more →' : 'Review →'}
+          </div>
+        </button>
+      )}
+
+      {/* progress stats — side by side on large screens */}
+      {hasMastery ? (
+        <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-4">
+          <CourseStats />
+          <RetentionPanel />
+        </div>
+      ) : (
+        <CourseStats />
+      )}
 
       {/* course */}
       <div className="mb-3">

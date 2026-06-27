@@ -2,14 +2,17 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Interaction, Lesson, Step, ValidationResult } from '../../types/content';
-import type { InteractionState, McState, MatchPairsState, PyramidState, PyramidPickState, ChartPickState, SectorState, StageSelectState, CategoryBarsState, FamilySizeState, AnomalyPyramidState, MigrationFlowState, ExplainBackState, WorldMapState } from '../../types/interaction';
+import type { InteractionState, ExplainBackState } from '../../types/interaction';
 import { validate, resolveFeedback, resolveWrongFeedback } from '../../lib/validators';
+import { canCheck, isSelectionStep } from './stepInput';
 import { useProgressStore } from '../../store/progressStore';
 import { getOrderedLessons } from '../../content';
 import { recommendNext, computeLessonScore, countFirstTryCorrect, isLessonComplete, isLessonUnlocked } from '../../lib/mastery';
 import { isAiEnabled, buildStepContext, describeInteraction } from '../../lib/ai';
 import { playableSteps, toFullStepIndex, toPlayableStepIndex } from '../../lib/ai/lessonSteps';
 import { safeAuthoredHint } from '../../lib/ai/hintGuard';
+import { retrievability } from '../../lib/scheduler';
+import { allowHint } from '../../lib/scaffold';
 import { getWrongAnswerNudge } from '../../lib/ai/features/wrongAnswerNudge';
 import { gradeExplanation } from '../../lib/ai/features/explainBack';
 import InteractionRenderer from '../interactions/InteractionRenderer';
@@ -20,77 +23,6 @@ import Celebration from './Celebration';
 import SkillCheck from './SkillCheck';
 
 const EXPLAIN_GRADE_RETRY_MS = 15_000;
-
-function canCheck(step: Step, st: InteractionState | null): boolean {
-  if (!st) return false;
-  const { interaction } = step;
-  if (interaction.type === 'multiple-choice') return !!(st as McState).selectedId;
-  if (interaction.type === 'stage-select') return (st as StageSelectState).selectedStage != null;
-  if (interaction.type === 'population-pyramid' && interaction.config.mode === 'classify')
-    return (st as PyramidState).selectedStage != null;
-  if (interaction.type === 'sector-bars' && interaction.config.mode === 'classify')
-    return (st as SectorState).selectedStage != null;
-  if (interaction.type === 'match-pairs') {
-    const p = (st as MatchPairsState).placements;
-    if (interaction.config.multiPerTile) {
-      // Multi-category mode: if a per-tile cap is set, require every tile filled to
-      // exactly that many categories; otherwise just require each placed somewhere.
-      const cap = interaction.config.maxPerTile;
-      return interaction.config.tiles.every((t) => {
-        const count = Object.values(p).filter((arr) => arr.includes(t.id)).length;
-        return cap != null ? count === cap : count > 0;
-      });
-    }
-    if (interaction.config.multiPerSlot) {
-      // Bucket mode: require every TILE to be placed somewhere.
-      return interaction.config.tiles.every((t) => Object.values(p).some((arr) => arr.includes(t.id)));
-    }
-    // Single-match mode: require every slot to hold a tile.
-    return interaction.config.slots.every((s) => (p[s.id]?.length ?? 0) > 0);
-  }
-  if (interaction.type === 'pyramid-pick') return (st as PyramidPickState).selectedStages.length > 0;
-  if (interaction.type === 'chart-pick') return (st as ChartPickState).selectedId != null;
-  if (interaction.type === 'category-bars' && interaction.config.mode === 'adjust') {
-    const fig = (st as CategoryBarsState).figures;
-    return fig.infectious + fig.famine + fig.accidents + fig.chronic >= 4;
-  }
-  if (interaction.type === 'family-size' && interaction.config.mode === 'adjust') {
-    return (st as FamilySizeState).children > 0;
-  }
-  if (interaction.type === 'anomaly-pyramid' && interaction.config.mode === 'adjust') {
-    const s = st as AnomalyPyramidState;
-    return (s.maleCohorts?.length ?? 0) === 9 && (s.femaleCohorts?.length ?? 0) === 9;
-  }
-  if (interaction.type === 'explain-back') {
-    const min = interaction.config.minChars ?? 15;
-    return ((st as ExplainBackState).text?.trim().length ?? 0) >= min;
-  }
-  if (interaction.type === 'migration-flow') {
-    const s = st as MigrationFlowState;
-    return s.inMigration > 0 || s.outMigration > 0;
-  }
-  if (interaction.type === 'world-map' && interaction.config.mode === 'pick') {
-    return (st as WorldMapState).selectedId != null;
-  }
-  if (interaction.type === 'world-map' && interaction.config.mode === 'pick-multi') {
-    const required = (step.answer as { countryIds?: string[] } | undefined)?.countryIds?.length ?? 0;
-    return (st as WorldMapState).selectedIds?.length === required;
-  }
-  return true;
-}
-
-// Selection-style steps reset their pick on "Try again" (a fresh remount so the
-// learner re-chooses). Drag steps instead keep their current shape to nudge.
-function isSelectionStep(step: Step): boolean {
-  const { interaction } = step;
-  if (interaction.type === 'multiple-choice' || interaction.type === 'stage-select') return true;
-  if (interaction.type === 'population-pyramid' && interaction.config.mode === 'classify') return true;
-  if (interaction.type === 'sector-bars' && interaction.config.mode === 'classify') return true;
-  if (interaction.type === 'pyramid-pick') return true;
-  if (interaction.type === 'chart-pick') return true;
-  if (interaction.type === 'world-map' && (interaction.config.mode === 'pick' || interaction.config.mode === 'pick-multi')) return true;
-  return false;
-}
 
 // viewBox aspect ratio (width / height) of each SVG-based interaction. Used so
 // the white card can hug the graph's actual rendered width once the chart is
@@ -487,11 +419,25 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
 
   const showContinue = isExplore || locked;
   const checkDisabled = !canCheck(step, iState);
+  // Scaffolding that fades: withhold the authored hint once the step's concepts are
+  // well-retained (desirable difficulty); keep it while they're weak or unseen.
+  const masteryMap = store.data?.mastery ?? {};
+  const stepConcepts = step.concepts ?? [];
+  const stepRecall =
+    stepConcepts.length === 0
+      ? 0
+      : Math.min(
+          ...stepConcepts.map((c) => {
+            const rec = masteryMap[c];
+            return rec ? retrievability(rec, Date.now()) : 0;
+          }),
+        );
   const showHintButton =
     !isExplore &&
     !locked &&
     !isAiEnabled &&
     !!safeAuthoredHint(step) &&
+    allowHint(stepRecall) &&
     !(result && !result.correct);
   const showHintBar = hintMessage && !feedbackDismissed && !feedback;
   const showFeedback = feedback && !feedbackDismissed;

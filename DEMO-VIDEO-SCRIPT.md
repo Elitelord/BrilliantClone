@@ -1,6 +1,6 @@
 # Demo Video Script — Population Path (DTM)
 
-A 3–5 minute early-submission demo. Target runtime **~4:00**. Read this top to bottom once, do a single rehearsal run, then record.
+A 3–5 minute demo. Early-submission target **~4:00**; the **final submission adds a ~50s Phase 3 (learning-science) beat** — see §3.5 — for **~5:00**, still inside the window. Read this top to bottom once, do a single rehearsal run, then record.
 
 ---
 
@@ -19,7 +19,7 @@ A 3–5 minute early-submission demo. Target runtime **~4:00**. Read this top to
 
 Slightly shorter (12 steps vs 14) and has the most visually striking hero (drag-to-reshape a population pyramid). It also has all three AI features and a clean skill-check template (`pyramid-stage`). Use it if L1 misbehaves on the day. Trade-off: `pyramid-stage` verification is a touch less bulletproof than `stage-from-rates`, so rehearse/re-roll the skill check (see notes below).
 
-> **Caveat I confirmed while reading the content:** In every early lesson the `explain-back` step is the **last** step, immediately before the skill check. That's good news — **one lesson (L1) covers all three AI features end-to-end**, no splitting needed. (If you ever wanted explain-back on a different lesson, L2, L3-structure, and L3-epi all have one too.) The newer lessons — `limits-of-growth`, `why-people-move`, `place-country` — should be **avoided for the recording**: their concepts (density/Malthus, migration, place-the-country) map to skill-check templates that verify far less reliably, so the skill check can come up short or empty.
+> **Caveat I confirmed while reading the content:** In every early lesson the `explain-back` step is the **last** step, immediately before the skill check. That's good news — **one lesson (L1) covers all three AI features end-to-end**, no splitting needed. (If you ever wanted explain-back on a different lesson, L2, L3-structure, and L3-epi all have one too.) For the single-take AI-feature pass, the newer lessons — `limits-of-growth`, `why-people-move`, `place-country` — lean more on the qualitative (solver-agreement) verification path, which is less predictable on camera than L1's rock-solid `stage-from-rates` / `population-trend` items, so **L1 is still the safest recording**. (Those lessons are fully covered now — `density-measure`, `malthus-outcome`, `net-migration` templates all ship — they're just a touch more variable live.)
 
 ---
 
@@ -30,6 +30,7 @@ Slightly shorter (12 steps vs 14) and has the most visually striking hero (drag-
 3. **Rehearse the skill check ONCE.** The skill check is generated live via the OpenAI API (model just bumped to **gpt-4o**), so quality varies per generation. Do a full practice run of `dtm-engine` to the skill check. If a question looks weak or awkward, **re-roll it**: exit the lesson, re-enter, replay the final `explain-back` step, and finish again to regenerate a fresh set. Lock in a run where all 3 questions look sharp, then record.
 4. **Position for a clean run.** Progress resumes mid-lesson. For the cleanest take, start `dtm-engine` from the course path and click `Continue` through the intro `learn`/`explore` steps quickly — or pre-advance to just before your hero beat and use a jump cut.
 5. **Have your wrong answer ready.** At `predict-tfr-cbr`, the deliberately-wrong-but-tempting choice is **"A has a younger population…"** — pick that to trigger a meaty nudge, then correct to **"B has a younger population…"**.
+6. **(Final submission) Make sure something is due for review.** The Phase 3 **Daily Review** only surfaces concepts that are *due*. Sign in with an account that has progress from a previous day (the reviewer demo account already does) — a lesson you just finished won't be due until tomorrow. The home **Memory** panel renders regardless.
 
 ---
 
@@ -74,6 +75,19 @@ Slightly shorter (12 steps vs 14) and has the most visually striking hero (drag-
 
 ---
 
+## 3.5 Phase 3 — learning science (final submission, ~50s)
+
+Insert this just before the architecture close (pushes the total to ~5:00, still in the window). It shows the spaced-repetition + interleaving + retention layer the brief asks for. See prep bullet 6 — sign in with an account that has prior-day progress so concepts are **due**.
+
+### Phase 3 beat (~50s)
+- **On screen:** Home screen — point to the **"Daily Review · N due"** card and the **Memory** panel (the colored concept grid + Solid / Fading / Due counts + recall ring).
+- **Do:** Tap **Daily Review**. In the session, show two consecutive items that are **different interaction types from different lessons** (interleaving), and — with AI on — a **freshly-rephrased AP-style question** for a concept first seen lessons ago (retrieval + spacing). Answer through to the end.
+- **On finish:** the results card shows **"Recall +X%"** across the reviewed concepts. Return home and point out the **Memory** panel: the due count dropped, the concept dots shifted toward green, the recall ring rose.
+- **Say:** *"Phase 3 is the learning science. Every concept rides a spaced-repetition curve and is allowed to 'fade' over time, so the app resurfaces it right before you'd forget — in a mixed review that interleaves problem types across lessons, so you have to choose the right approach, not repeat the last one. With AI on, the questions are freshly rephrased so you can't memorize wording; with AI off, it replays your own problems and still teaches. And I measure the thing that matters — recall strength going up — not minutes logged. Engagement isn't learning."*
+- **(Optional, ~10s) AI-off proof:** note that turning AI off still runs the review on authored problems and still measures retention — the learning-science layer doesn't depend on the model.
+
+---
+
 ## 4. Quick recording checklist
 
 - [ ] Signed in on **https://brilliantclone-b4a2a.web.app** (or localhost) with AI confirmed ON.
@@ -82,3 +96,5 @@ Slightly shorter (12 steps vs 14) and has the most visually striking hero (drag-
 - [ ] Have a partial explain-back answer ready, then the full one.
 - [ ] Screen recorder set to capture the feedback bar / nudge area clearly.
 - [ ] Mic check; one rehearsal of the voiceover for pacing.
+- [ ] **(Final)** Account has prior-day progress so the **Daily Review** shows concepts due (§3.5).
+- [ ] **(Final)** Rehearsed the Phase 3 beat: Daily Review → interleaved items → "Recall +X%" → Memory panel updates.

@@ -220,22 +220,30 @@ describe('updateMasteryForConcepts', () => {
     expect(next['natural-increase'].wrongCount).toBe(2);
   });
 
-  it('omits nextDue when not previously set', () => {
-    const next = updateMasteryForConcepts({}, ['migration'], false);
-    expect(next.migration).not.toHaveProperty('nextDue');
+  it('schedules a brand-new concept one day out (box 0) on a correct answer', () => {
+    const next = updateMasteryForConcepts({}, ['migration'], true);
+    expect(next.migration.nextDue).toBe(Date.now() + 86_400_000);
+    expect(Number.isInteger(next.migration.nextDue)).toBe(true);
   });
 
-  it('preserves nextDue when previously set', () => {
+  it('relearns a wrong concept within a day', () => {
+    const next = updateMasteryForConcepts({}, ['migration'], false);
+    expect(next.migration.nextDue).toBe(Date.now() + 86_400_000);
+  });
+
+  it('advances the interval on a spaced correct review', () => {
+    const day = 86_400_000;
     const prev = {
       migration: {
         conceptId: 'migration',
         strength: 0.5,
-        lastSeen: 1,
+        lastSeen: Date.now() - day, // last interval was 1 day (box 0)
         wrongCount: 0,
-        nextDue: 1_700_000_000_000,
+        nextDue: Date.now(), // due now
       },
     };
     const next = updateMasteryForConcepts(prev, ['migration'], true);
-    expect(next.migration.nextDue).toBe(1_700_000_000_000);
+    // box 0 (1d) -> box 1 (3d), anchored from now
+    expect(next.migration.nextDue).toBe(Date.now() + 3 * day);
   });
 });

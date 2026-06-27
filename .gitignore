@@ -44,3 +44,6 @@ node_check.txt
 
 # agent skills (installed locally; see skills-lock.json for sources)
 .agents/
+
+# claude code local state (worktrees, settings, scratch) — never commit
+.claude/

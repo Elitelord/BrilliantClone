@@ -8,6 +8,7 @@ import HomePage from './routes/HomePage';
 import LeaderboardPage from './routes/LeaderboardPage';
 import AccountPage from './routes/AccountPage';
 import LessonPage from './routes/LessonPage';
+import ReviewPage from './routes/ReviewPage';
 
 export default function App() {
   const init = useAuthStore((s) => s.init);
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/account" element={<AccountPage />} />
           </Route>
           <Route path="/lesson/:lessonId" element={<LessonPage />} />
+          <Route path="/review" element={<ReviewPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -33,6 +33,8 @@ interface ProgressState {
   registerCorrect: (lesson: Lesson, step: Step, isFirstTry?: boolean) => void;
   completeLesson: (lesson: Lesson) => void;
   recordSkillCheckScore: (lesson: Lesson, result: { correct: number; total: number }) => void;
+  /** Phase 3: record a spaced-review answer — updates concept mastery + schedule (+ streak on correct). */
+  registerReviewResult: (concepts: string[], correct: boolean) => void;
 }
 
 function emptyLessonProgress(lessonId: string): LessonProgress {
@@ -246,4 +248,36 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     set({ data: { ...data, progress: { ...data.progress, [lesson.id]: lp } } });
     void persistProgress(data.profile, lp);
   },
+
+  registerReviewResult: (concepts, correct) => {
+    const data = get().data;
+    if (!data) return;
+    const mastery = concepts.length
+      ? updateMasteryForConcepts(data.mastery, concepts, correct)
+      : data.mastery;
+    // A correct recall counts toward the daily goal, like a lesson problem.
+    const streak = correct ? recordProblem(data.streak) : data.streak;
+    set({ data: { ...data, mastery, streak } });
+    if (concepts.length) void persistMastery(data.profile, concepts.map((c) => mastery[c]));
+    if (correct) void persistStreak(data.profile, streak);
+  },
 }));
+
+// Dev-only QA helper: make every tracked concept due for review again. In the browser
+// console (signed in), run `__resetReviewSchedule()` then refresh. Gated to dev builds,
+// so it is dead-code-eliminated from production and can never run on the live app.
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  (window as unknown as { __resetReviewSchedule?: (daysAgo?: number) => string }).__resetReviewSchedule =
+    (daysAgo = 1) => {
+      const { data } = useProgressStore.getState();
+      if (!data) return 'No user data loaded yet — sign in and wait for the home screen first.';
+      const past = Math.max(1, Math.round(Date.now() - daysAgo * 86_400_000));
+      const mastery = Object.fromEntries(
+        Object.entries(data.mastery).map(([id, r]) => [id, { ...r, nextDue: past }]),
+      );
+      useProgressStore.setState({ data: { ...data, mastery } });
+      void persistMastery(data.profile, Object.values(mastery));
+      const n = Object.keys(mastery).length;
+      return `Set ${n} concept${n === 1 ? '' : 's'} due (nextDue = ${daysAgo}d ago). Refresh to see the Daily Review.`;
+    };
+}

@@ -513,7 +513,7 @@ The purpose of this BrainLift is to develop a rigorous, defensible point of view
 - **DOK 2 — Summary:** Two guardrails work together: **grounding** (the model only ever sees structured, validated state) and a **no-giveaway guard** (a rules-based filter that catches the model when it tries to hand over the answer). The result is AI feedback that is tailored to the learner's exact mistake yet cannot short-circuit the desirable difficulty of solving it themselves.
 - **Link to source:** `src/lib/ai/hintGuard.ts`, `src/lib/ai/features/wrongAnswerNudge.ts`, `src/lib/ai/describeInteraction.ts` (repo)
 
-#### Subcategory 4.3: The learning-science layer (Phase 3 design intent)
+#### Subcategory 4.3: The learning-science layer (Phase 3 — shipped)
 
 **Source: `PHASE3-LEARNING-SCIENCE.md` — Phase 3 learning-science notes**
 
@@ -523,8 +523,9 @@ The purpose of this BrainLift is to develop a rigorous, defensible point of view
   - **Working memory is limited (~7 items)** — don't overload a single step; **prior knowledge/previewing** activates recall and speeds new learning.
   - **Spacing rule of thumb:** a gap too short makes retrieval too easy; aim for roughly a **10–20% test delay** before restudy, so retrieval still succeeds but isn't trivial.
   - Implementation intents: **map prerequisites**, define mastery targets, **generate parallel diagnostic items** and adaptive forms at scale, design **curriculum-aligned MCQ distractors**, and **rephrase prompts on retrieval** so learners can't pattern-match memorized strings. For AI feedback, aim **beyond text** (images/visuals/video where possible).
+  - **Shipped:** these intents are now implemented — an SM-2-lite **spaced-repetition scheduler** with a read-time forgetting curve (`scheduler.ts`), an **interleaved Daily Review** (`review/session.ts`) whose items are AI-rephrased *or* authored-replay (so it still teaches with AI off), a **concept prerequisite graph** (`concepts.ts`), **scaffolding-that-fades** (`scaffold.ts`), and a **retention dashboard** that measures recall — not engagement.
 - **DOK 2 — Summary:** Phase 3 is where AI and learning science fully converge: AI's content-generation strength (parallel items, adaptive forms, rephrased retrieval prompts, multimodal feedback) is pointed directly at the highest-utility evidence-based mechanics (retrieval, spacing, interleaving, mastery). Notably, "poor indicators of learning" (engagement, time on task) are explicitly named — a guard against optimizing AI for engagement theater instead of learning.
-- **Link to source:** `PHASE3-LEARNING-SCIENCE.md` (repo)
+- **Link to source:** `PHASE3-LEARNING-SCIENCE.md`; implementation in `src/lib/scheduler.ts`, `src/lib/concepts.ts`, `src/lib/scaffold.ts`, `src/lib/review/` and `src/lib/ai/features/reviewItems.ts` (repo)
 
 **Source: `research/ap-human-geography-dtm-teaching-knowledge-base.md` — teaching-methodology comparison**
 
@@ -658,18 +659,19 @@ Per the brief, every AI feature had to honor three rules, and the implementation
 - **Free-roaming chatbot tutor** — the brief explicitly warns against it; ungrounded and low-signal.
 - **Full LLM-driven path reordering** — deterministic mastery gating already does this honestly; an LLM would add risk, not value.
 
-**Known limitation (documented as a decision, not an oversight).** The skill-check questions are **correct and verified, but the question *writing* isn't yet at full AP-exam rigor** — the prose and distractors aren't sharp enough. This is deliberate triage for the early checkpoint: correctness was the non-negotiable, polish was not. **Plan for the final (Sunday):** (1) the stronger model (already bumped to `gpt-4o`) for sharper stimuli, and (2) **expand the verifiable templates to cover the newer lessons** — L4 (limits of growth / density + Malthus), L6 (migration), and L7 (place-the-country), whose concepts don't all map cleanly onto the current five core templates (`stage-from-rates`, `population-trend`, `pyramid-stage`, `sector-dominant`, `cause-of-death`). Until a concept has a verifiable template, I'd rather ship no question than an unverified one.
+**Known limitation (documented as a decision, not an oversight).** The skill-check questions are **correct and verified; the remaining gap is question *writing* polish** — distractor sharpness and AP-prose voice, mitigated by running `gpt-4o`. Verifiable coverage has since grown well beyond the original five templates to **11 computational templates** (adding `net-migration`, `density-measure`, `malthus-outcome`, `doubling-time`, `dependency-ratio`, `replacement-level`, so L4/L5/L6 are covered) plus a **qualitative** path for reasoning items that have no formula — those ship only on **independent-solver agreement** (two blind cold-solvers must concur). The discipline is unchanged: until an item passes verification (recompute *or* solver agreement), I'd rather ship no question than an unverified one.
 
-#### Phase 3 — Learning-science layer (planned / in progress for Sunday)
+#### Phase 3 — Learning-science layer (shipped)
 
-The Phase 3 design intent (from `PHASE3-LEARNING-SCIENCE.md`) points AI's content-generation strength directly at the **highest-utility, evidence-based mechanics**:
+Phase 3 layers the highest-utility, evidence-based mechanics on top of the working app — each as a concrete, **additive** feature that still teaches with AI off. The new surface is a **Daily Review** (`/review`) plus a **retention dashboard** on the home screen.
 
-- **Retrieval practice** over re-reading — frequent low-stakes recall, with prompts **rephrased on each retrieval** so learners reconstruct meaning instead of pattern-matching memorized strings.
-- **Spacing** — bring concepts back on a deliberate delay (rule of thumb: a ~10–20% test delay so retrieval still succeeds but isn't trivial), treating learning as **recursive, not linear**.
-- **Interleaving** — mix problem types so learners must *choose* the right approach (also guarantees spacing).
-- **Mastery + cognitive load** — respect working-memory limits per step, map prerequisites, generate **parallel diagnostic items** and curriculum-aligned distractors at scale.
+- **Spaced repetition** (`src/lib/scheduler.ts`) — every concept carries a `nextDue` date (SM-2-lite: an expanding interval ladder 1 → 3 → 7 → 16 → 35 days that advances on a *spaced* correct recall and resets to a 1-day relearn on a miss). A read-time **forgetting curve** (`retrievability()`, Half-Life-Regression-style) decays recall between reviews, so even a once-"mastered" concept resurfaces. Grounded in the evidence already in this BrainLift: SuperMemo/SM-2 (expanding intervals), Duolingo's Half-Life Regression (continuous retrievability), and Cepeda et al.'s ~10–20% spacing heuristic.
+- **Retrieval practice with rephrasing** — the review is recall, not re-reading. With AI on, `features/reviewItems.ts` generates **fresh, rephrased** AP-style questions per due concept, reusing the Phase 2 verifier (recompute + solver-agreement) so a review item can never teach a wrong answer. With AI off, the session draws on an **authored, pre-verified review bank** (`src/content/reviewBank.ts` — AP-style items whose answers are recomputed against `dtm.ts` in a unit test, the same "verify anything checkable" discipline applied to authored content) plus **replayed authored steps** (`review/authoredItems.ts`, scaffolds stripped, options shuffled) — so retrieval stays varied and correct with no model at all.
+- **Interleaving** (`src/lib/review/session.ts`) — the queue pulls *due* concepts from across lessons and orders them so consecutive items differ in lesson and interaction type, forcing the learner to choose the right approach instead of repeating the last one (and guaranteeing spacing). The opposite of the linear, blocked course path.
+- **Mastery + a concept prerequisite graph** (`src/lib/concepts.ts`) — a concept-level prereq graph (beyond lesson-level gating) lets the scheduler resurface a failing prerequisite before its dependent; the mastery signal is now decay-aware (retained, not just once-correct).
+- **Scaffolding that fades** (`src/lib/scaffold.ts`) — as recall strengthens, support is withdrawn: the authored hint disappears once a concept is solid, and review prefers harder items for stronger concepts (desirable difficulty).
 
-**Why these and not engagement features:** the notes explicitly flag **engagement and time-on-task as poor indicators of learning**. The whole layer optimizes for durable retention, not in-session ease — and AI is used precisely where authored content can't scale (parallel items, adaptive forms, rephrased prompts), never as a replacement for the learner doing the work.
+**Why these, and how I measure them — not engagement.** The notes flag **engagement and time-on-task as poor indicators of learning**, so the "measure the effect" surface (`RetentionPanel` + the review's before/after recall delta) tracks *retention* — how many concepts are solid / fading / due, and how far a session moved recall — never minutes or streak pressure. AI is used only where authored content can't scale (fresh parallel items, rephrased prompts), never as a replacement for the learner doing the work.
 
 ### 4. Code analysis (AI-generated vs hand-written)
 
