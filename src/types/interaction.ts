@@ -104,6 +104,16 @@ export interface ExplainBackState {
   text: string;
 }
 
+export interface PolicyLabState {
+  growthRate: number; // effective growth per 1,000 after policy levers
+  trend: Trend;
+  population: number; // projected (true) population after the configured decades
+  hasProNatalist: boolean; // any pro-natalist lever active
+  activeAnti: number; // count of active anti-natalist levers
+  activePro: number; // count of active pro-natalist levers
+  guess?: number; // 'guess' mode: the learner's slider estimate, in millions
+}
+
 export interface AnomalyPyramidState {
   selectedId?: string;
   seen?: boolean;
@@ -117,6 +127,54 @@ export interface MigrationFlowState {
   netMigration: number;
   totalChange: number;
   trend: Trend;
+  presetId?: string;
+}
+
+export interface MigrationJourneyState {
+  pushIds: string[];
+  pullIds: string[];
+  activeEventId?: string;
+  motivated: boolean;
+  departed: boolean;
+  result?: 'arrived' | 'blocked' | 'diverted';
+  seen: boolean;
+}
+
+export interface MigrationEffectsState {
+  flow: number; // 0–100, how many migrate
+  seen: boolean;
+}
+
+export interface FoodHistoryState {
+  activeEventId?: string;
+  seen: boolean;
+}
+
+export interface GrowthPlotterState {
+  growthRate: number; // % per year
+  foodSlope: number; // food capacity added per year
+  crosses: boolean; // population catches the food line within the horizon
+  crossYear: number | null; // year of the Malthusian crisis point (if any)
+}
+
+export interface CarryingCapacityState {
+  land: number;
+  yieldLevel: number;
+  waterSupply: number;
+  foodCeiling: number; // land × yieldLevel
+  waterCeiling: number; // waterSupply
+  capacity: number; // min(foodCeiling, waterCeiling) — the binding constraint
+  binding: 'food' | 'water';
+}
+
+export interface DensityCalcState {
+  population: number;
+  totalLand: number;
+  arableLand: number;
+  farmers: number;
+  arithmetic: number;
+  physiological: number;
+  agricultural: number;
   presetId?: string;
 }
 
@@ -143,7 +201,14 @@ export type InteractionState =
   | ChartPickState
   | CategoryBarsState
   | FamilySizeState
+  | PolicyLabState
   | AnomalyPyramidState
   | MigrationFlowState
+  | MigrationJourneyState
+  | MigrationEffectsState
+  | FoodHistoryState
   | ExplainBackState
+  | GrowthPlotterState
+  | DensityCalcState
+  | CarryingCapacityState
   | WorldMapState;

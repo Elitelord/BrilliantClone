@@ -35,6 +35,14 @@ export function computeLessonScore(lesson: Lesson, progress?: LessonProgress): n
   return Math.round((correct / total) * 100);
 }
 
+/** Combine several {correct,total} components into a single 0..100 percentage. */
+export function combinedScore(parts: Array<{ correct: number; total: number }>): number {
+  const correct = parts.reduce((sum, p) => sum + p.correct, 0);
+  const total = parts.reduce((sum, p) => sum + p.total, 0);
+  if (total === 0) return 100;
+  return Math.round((correct / total) * 100);
+}
+
 export function isLessonComplete(progress?: LessonProgress): boolean {
   return !!progress?.finishedOnce;
 }

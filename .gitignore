@@ -13,6 +13,21 @@ dist-ssr
 firebase-debug.log
 firestore-debug.log
 
+# secrets / credentials (never commit)
+*.pem
+*.key
+*.p12
+*.p8
+serviceAccount*.json
+service-account*.json
+*-adminsdk-*.json
+*firebase-adminsdk*.json
+.runtimeconfig.json
+google-services.json
+GoogleService-Info.plist
+secrets.*
+*.secret
+
 # editor / os
 .DS_Store
 *.suo

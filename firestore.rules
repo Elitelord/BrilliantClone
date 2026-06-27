@@ -9,10 +9,11 @@ service cloud.firestore {
       return id in [
         'dtm-engine',
         'population-pyramids',
-        'sector-shift',
         'epi-transition',
+        'limits-of-growth',
         'population-structure',
-        'model-breaks',
+        'why-people-move',
+        'place-country',
       ];
     }
 
@@ -107,6 +108,12 @@ service cloud.firestore {
         );
     }
 
+    function isValidAvatar(data) {
+      return !('avatar' in data)
+        || data.avatar == null
+        || (data.avatar is string && data.avatar.size() <= 16);
+    }
+
     function validUserCreate() {
       return request.resource.data.keys().hasAll(['displayName', 'createdAt'])
         && request.resource.data.displayName is string
@@ -114,6 +121,7 @@ service cloud.firestore {
         && request.resource.data.displayName.size() <= 100
         && isWholeNumber(request.resource.data.createdAt)
         && request.resource.data.createdAt > 0
+        && isValidAvatar(request.resource.data)
         && (
           !('email' in request.resource.data)
           || request.resource.data.email == null
@@ -130,26 +138,55 @@ service cloud.firestore {
       return (
         (changed.hasOnly(['streak']) && isValidStreak(request.resource.data.streak))
         || (
-          changed.hasOnly(['displayName', 'email', 'createdAt', 'streak'])
+          changed.hasOnly(['displayName', 'email', 'avatar', 'createdAt', 'streak'])
           && request.resource.data.displayName is string
           && request.resource.data.displayName.size() > 0
           && request.resource.data.displayName.size() <= 100
           && request.resource.data.createdAt == resource.data.createdAt
+          && isValidAvatar(request.resource.data)
           && (
             !('email' in request.resource.data)
             || request.resource.data.email == null
             || (request.resource.data.email is string && request.resource.data.email.size() <= 320)
           )
-          && isValidStreak(request.resource.data.streak)
+          && (
+            !('streak' in request.resource.data)
+            || isValidStreak(request.resource.data.streak)
+          )
         )
       );
+    }
+
+    // Public streak leaderboard. By construction it stores ONLY name + avatar +
+    // streak, so it can never expose email or progress to other readers.
+    function isValidLeaderboard(data) {
+      return data.keys().hasOnly(['displayName', 'avatar', 'streak', 'longest', 'updatedAt'])
+        && data.displayName is string
+        && data.displayName.size() > 0
+        && data.displayName.size() <= 100
+        && data.avatar is string
+        && data.avatar.size() <= 16
+        && isWholeNumber(data.streak)
+        && data.streak <= 100000
+        && isWholeNumber(data.longest)
+        && data.longest <= 100000
+        && isWholeNumber(data.updatedAt)
+        && data.updatedAt > 0;
+    }
+
+    match /leaderboard/{userId} {
+      // Any signed-in learner can read the public leaderboard…
+      allow read: if request.auth != null;
+      // …but you may only write your OWN entry, and only the safe public fields.
+      allow create, update: if isOwner(userId) && isValidLeaderboard(request.resource.data);
+      allow delete: if isOwner(userId);
     }
 
     match /users/{userId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId) && validUserCreate();
       allow update: if isOwner(userId) && validUserUpdate();
-      allow delete: if false;
+      allow delete: if isOwner(userId);
 
       match /progress/{lessonId} {
         allow read: if isOwner(userId);

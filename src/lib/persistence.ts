@@ -1,12 +1,14 @@
 // Persistence layer. Real (non-guest) users sync to Firestore; guests and
 // unconfigured setups use localStorage. Same interface either way.
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import { emptyStreak } from './streak';
+import { normalizeAvatar } from './avatars';
 import type {
   UserData,
   UserProfile,
   LessonProgress,
+  LeaderboardEntry,
   MasteryRecord,
   StreakState,
   LessonPlayState,
@@ -148,6 +150,7 @@ async function writeAllUserData(profile: UserProfile, data: UserData): Promise<v
     {
       displayName: profile.displayName,
       email: profile.email ?? null,
+      avatar: profile.avatar ?? null,
       createdAt: profile.createdAt,
       streak: data.streak,
     },
@@ -212,6 +215,7 @@ async function fetchUserData(profile: UserProfile): Promise<UserData> {
   const mergedProfile: UserProfile = {
     ...profile,
     createdAt: (snap.exists() && (snap.data().createdAt as number)) || profile.createdAt,
+    avatar: (snap.exists() && (snap.data().avatar as string)) || profile.avatar,
   };
 
   if (!snap.exists()) {
@@ -289,10 +293,104 @@ export async function persistStreak(profile: UserProfile, streak: StreakState): 
   mirrorLocal(profile, (d) => {
     d.streak = streak;
   });
+  void publishLeaderboard(profile, streak);
   if (!useFirestore(profile)) return;
   try {
     await setDoc(doc(db!, 'users', profile.uid), { streak }, { merge: true });
   } catch (e) {
     console.warn('persistStreak failed (kept locally).', e);
+  }
+}
+
+/** Update editable profile fields (name / avatar). Mirrors locally and to Firestore. */
+export async function updateUserProfileFields(profile: UserProfile): Promise<void> {
+  mirrorLocal(profile, (d) => {
+    d.profile = { ...d.profile, ...profile };
+  });
+  if (!useFirestore(profile)) return;
+  try {
+    await setDoc(
+      doc(db!, 'users', profile.uid),
+      {
+        displayName: profile.displayName,
+        email: profile.email ?? null,
+        avatar: profile.avatar ?? null,
+      },
+      { merge: true },
+    );
+  } catch (e) {
+    console.warn('updateUserProfileFields failed (kept locally).', e);
+  }
+}
+
+// ---- Leaderboard --------------------------------------------------------
+// A dedicated public collection that, by design, stores ONLY name + avatar +
+// streak. Email and progress never enter it, so the leaderboard cannot leak
+// sensitive data even to a signed-in reader.
+
+/** Publish the current learner's public streak entry. No-op for guests/offline. */
+export async function publishLeaderboard(profile: UserProfile, streak: StreakState): Promise<void> {
+  if (profile.isGuest || !db) return;
+  try {
+    await setDoc(
+      doc(db, 'leaderboard', profile.uid),
+      {
+        displayName: profile.displayName,
+        avatar: normalizeAvatar(profile.avatar),
+        streak: Math.max(0, Math.floor(streak.count)),
+        longest: Math.max(0, Math.floor(streak.longest)),
+        updatedAt: Date.now(),
+      },
+      { merge: true },
+    );
+  } catch (e) {
+    console.warn('publishLeaderboard failed.', e);
+  }
+}
+
+/** Read all public leaderboard entries (name + avatar + streak only). */
+export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
+  if (!db) return [];
+  try {
+    const snap = await getDocs(collection(db, 'leaderboard'));
+    const out: LeaderboardEntry[] = [];
+    snap.forEach((d) => {
+      const v = d.data() as Partial<LeaderboardEntry>;
+      out.push({
+        uid: d.id,
+        displayName: typeof v.displayName === 'string' ? v.displayName : 'Learner',
+        avatar: normalizeAvatar(typeof v.avatar === 'string' ? v.avatar : undefined),
+        streak: typeof v.streak === 'number' ? v.streak : 0,
+        longest: typeof v.longest === 'number' ? v.longest : 0,
+      });
+    });
+    return out;
+  } catch (e) {
+    console.warn('fetchLeaderboard failed.', e);
+    return [];
+  }
+}
+
+/** Best-effort deletion of all of a user's stored data (used by delete-account). */
+export async function deleteAccountData(profile: UserProfile): Promise<void> {
+  try {
+    localStorage.removeItem(lsKey(profile.uid));
+  } catch {
+    /* ignore */
+  }
+  if (!useFirestore(profile)) return;
+  try {
+    const [progSnap, masterySnap] = await Promise.all([
+      getDocs(collection(db!, 'users', profile.uid, 'progress')),
+      getDocs(collection(db!, 'users', profile.uid, 'mastery')),
+    ]);
+    await Promise.all([
+      ...progSnap.docs.map((d) => deleteDoc(d.ref)),
+      ...masterySnap.docs.map((d) => deleteDoc(d.ref)),
+    ]);
+    await deleteDoc(doc(db!, 'leaderboard', profile.uid)).catch(() => {});
+    await deleteDoc(doc(db!, 'users', profile.uid)).catch(() => {});
+  } catch (e) {
+    console.warn('deleteAccountData failed.', e);
   }
 }

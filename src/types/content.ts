@@ -289,6 +289,28 @@ export interface FamilySizeConfig {
   maxChildren?: number;
 }
 
+export interface PolicyLabConfig {
+  /**
+   * 'toggle' (default): learner toggles levers themselves.
+   * 'guess': levers are preset and locked (a country's chosen mix); the learner
+   * estimates the resulting population with a slider instead of picking policies.
+   */
+  mode?: 'toggle' | 'guess';
+  /** Show the live running population total + trend verdict (explore). Hidden on the graded solve; ignored in 'guess' mode. */
+  showCount?: boolean;
+  /** Starting population in millions; default 50. */
+  initialPopulation?: number;
+  /** Baseline growth per 1,000 before any policy (the country grows too fast); default 14. */
+  baselineGrowth?: number;
+  /** Decades to project the running total; default 5 (50 years). */
+  decades?: number;
+  /** 'guess' mode: lever ids pre-selected and locked (a mix of pro/anti for the country shown). */
+  preset?: string[];
+  /** 'guess' mode: slider lower/upper bounds in millions (defaults derive from the starting population). */
+  guessMin?: number;
+  guessMax?: number;
+}
+
 export interface ExplainBackConfig {
   question: string;
   /** Key points a full-credit answer must touch (grounds the AI grader). */
@@ -355,6 +377,211 @@ export interface AnomalyPyramidConfig {
   showCaption?: boolean;
 }
 
+export type MigrationFactorCategory = 'economic' | 'political' | 'environmental' | 'social';
+
+export interface MigrationJourneyFactor {
+  id: string;
+  icon: string;
+  label: string;
+  /** CED factor category (economic / political / environmental / social). */
+  category?: MigrationFactorCategory;
+  /** Degree of choice this factor implies. Push factors drive forced vs voluntary moves. */
+  choice?: 'forced' | 'voluntary';
+}
+
+export interface MigrationJourneyEvent {
+  id: string;
+  icon: string;
+  label: string;
+  /** obstacle = blocks the trip; opportunity = diverts it and ends it early. */
+  kind: 'obstacle' | 'opportunity';
+  /** Position along the route, 0 (origin) → 1 (destination). */
+  position: number;
+  /** Caption shown when this event stops / diverts the family. */
+  outcome: string;
+  /**
+   * Opportunities only divert a move whose motive matches:
+   * 'economic' — a closer job only tempts an economically-motivated, voluntary move;
+   * 'safety'   — a safe place nearby only diverts a forced / safety-seeking move;
+   * 'any'      — diverts regardless of motive.
+   * Obstacles ignore this (they block every move).
+   */
+  matchesMotive?: 'economic' | 'safety' | 'any';
+  /** Caption shown when an opportunity does NOT match the motive and the family passes it by. */
+  passOutcome?: string;
+}
+
+export interface MigrationJourneyConfig {
+  // Explore-only hero: a family tries to move origin → destination. The learner
+  // toggles push (home) / pull (destination) factors to motivate the move, then
+  // sets out and watches intervening obstacles block or an intervening
+  // opportunity divert the journey. Ungraded (no Answer).
+  origin: { label: string; flag?: string };
+  destination: { label: string; flag?: string };
+  pushFactors: MigrationJourneyFactor[];
+  pullFactors: MigrationJourneyFactor[];
+  events: MigrationJourneyEvent[];
+  /** Caption shown when the family completes the trip with nothing in the way. */
+  arriveCaption?: string;
+}
+
+export interface MigrationEffect {
+  id: string;
+  icon: string;
+  label: string;
+  /** Drives the bar color: a gain (positive), a loss (negative), or a structural shift (neutral). */
+  tone: 'positive' | 'negative' | 'neutral';
+}
+
+export interface MigrationEffectsConfig {
+  // Explore-only hero: one flow of migrants, opposite effects on each end. The
+  // learner drags a "how many migrate?" slider and watches effect bars grow on
+  // the origin (remittances, brain drain, aging) and destination (labor,
+  // diversity, age-sex bulge). Ungraded (no Answer).
+  origin: { label: string; flag?: string };
+  destination: { label: string; flag?: string };
+  originEffects: MigrationEffect[];
+  destinationEffects: MigrationEffect[];
+  /** Caption under the panels. */
+  caption?: string;
+}
+
+export interface FoodHistoryEvent {
+  id: string;
+  /** Year the policy/innovation lands on the timeline. */
+  year: number;
+  icon: string;
+  label: string;
+  /** innovation = lifted the food line; setback = pushed it down. */
+  kind: 'innovation' | 'setback';
+  /** Detail shown when the learner selects this event. */
+  note: string;
+}
+
+export interface FoodHistoryConfig {
+  // Explore-only hero: a real country's population vs food-capacity curves over
+  // history, annotated with a clickable timeline of policies/innovations. Shows
+  // how innovation kept food ahead of population (Malthus's failed prediction).
+  // Ungraded (no Answer).
+  title?: string;
+  populationLabel?: string;
+  foodLabel?: string;
+  startYear: number;
+  endYear: number;
+  /** Y-axis ceiling for both series. */
+  maxValue: number;
+  /** Unit shown in the caption, e.g. "million people". */
+  unit?: string;
+  population: { year: number; value: number }[];
+  food: { year: number; value: number }[];
+  events: FoodHistoryEvent[];
+  /** Caption before any event is selected. */
+  baselineCaption?: string;
+}
+
+export interface GrowthPlotterConfig {
+  // A 2-curve plot: population (exponential) vs food (linear). The learner drags
+  // the population growth rate and/or the food-supply slope and watches whether &
+  // when the curves cross (the Malthusian crisis point).
+  /** Years to project across the x-axis. Default 50. */
+  horizonYears?: number;
+  /** Starting population index (left edge). Default 100. */
+  initialPop?: number;
+  /** Starting food capacity (left edge); begins above pop. Default 130. */
+  initialFood?: number;
+  /** Initial population growth rate, % per year. Default 2.4. */
+  initialGrowthRate?: number;
+  /** Draggable growth-rate range [min, max] in % per year. Default [0, 4]. */
+  growthRateRange?: [number, number];
+  /** Initial food-supply slope (capacity units added per year). Default 1.5. */
+  initialFoodSlope?: number;
+  /** Draggable food-slope range [min, max]. Default [0, 8]. */
+  foodSlopeRange?: [number, number];
+  /** Lock the food line (only the growth-rate handle is draggable). */
+  lockFood?: boolean;
+  /** Lock the growth rate (only the food handle is draggable). */
+  lockGrowth?: boolean;
+  /**
+   * How the learner moves the curves.
+   * 'drag' (default): drag the right-edge handles directly.
+   * 'levers': toggle Malthusian checks (positive/preventive, which slow population)
+   * and food-supply levers (which raise/lower the food line).
+   */
+  controls?: 'drag' | 'levers';
+  /** Show the curve chart + crisis/no-crisis verdict. Default true; set false on a graded solve to make the learner choose blind. */
+  showChart?: boolean;
+  /** Lever mode: cap how many levers the learner may select at once. */
+  maxLevers?: number;
+}
+
+export interface CarryingCapacityConfig {
+  // Carrying capacity = the BINDING resource ceiling: min(food, water), where
+  // food = farmland × yield-per-unit and water = water supply. Whichever runs out
+  // first sets the ceiling (Liebig's law of the minimum).
+  /** explore: shows the live capacity number + a population marker. solve: capacity hidden, learner hits a target. */
+  mode?: 'explore' | 'solve';
+  /** Show the numeric carrying-capacity readout. Default true in explore, false in solve. */
+  showCapacity?: boolean;
+  /** Initial farmland (resource) value. */
+  initialLand?: number;
+  /** Initial yield/technology value. */
+  initialYield?: number;
+  /** Initial water-supply ceiling (people water can sustain, same unit as capacity). */
+  initialWater?: number;
+  /** Slider range for farmland [min, max]. Default [0, 400]. */
+  landRange?: [number, number];
+  /** Slider range for yield/technology [min, max]. Default [1, 12]. */
+  yieldRange?: [number, number];
+  /** Slider range for water supply [min, max]. Default [0, 2000]. */
+  waterRange?: [number, number];
+  landLabel?: string; // default 'Farmland'
+  yieldLabel?: string; // default 'Yield per unit (technology)'
+  waterLabel?: string; // default 'Water supply'
+  landUnit?: string; // default 'M hectares'
+  yieldUnit?: string; // default 'people / hectare'
+  waterUnit?: string; // default 'M people'
+  /** Suffix on the capacity number, e.g. 'M people'. Default 'M people'. */
+  capacityUnit?: string;
+  /** explore: a current population (same unit as capacity) to compare against the ceiling. */
+  population?: number;
+  /** solve: target capacity to hit (drawn as a notch; the prompt states the number). */
+  targetCapacity?: number;
+}
+
+export interface CarryingCapacityAnswer {
+  /** Pass when computed capacity (farmland × yield) is within `tolerance` of this target. */
+  targetCapacity: number;
+  /** Absolute tolerance in capacity units; defaults to 5% of the target. */
+  tolerance?: number;
+}
+
+export interface DensityPreset {
+  id: string;
+  label: string;
+  flag?: string;
+  population: number; // millions of people
+  totalLand: number; // thousand km²
+  arableLand: number; // thousand km²
+  farmers: number; // millions of farmers
+}
+
+export interface DensityCalcConfig {
+  // Adjust population / total land / arable land / farmers; the three densities
+  // (arithmetic / physiological / agricultural) compute live.
+  /** explore: free calculator with presets. solve: graded against density thresholds. */
+  mode?: 'explore' | 'solve';
+  /** Starting input values. */
+  initial?: { population: number; totalLand: number; arableLand: number; farmers: number };
+  /** Country preset chips that snap all four inputs (e.g. Egypt / Canada / Bangladesh). */
+  presets?: DensityPreset[];
+  initialPresetId?: string;
+  /** Slider maxima for each input (UI only). */
+  maxPopulation?: number;
+  maxLand?: number;
+  maxArable?: number;
+  maxFarmers?: number;
+}
+
 export interface WorldMapConfig {
   /** Country ids from worldCountries.ts to show as map markers. */
   countryIds: string[];
@@ -392,9 +619,16 @@ export type Interaction =
   | { type: 'chart-pick'; config: ChartPickConfig }
   | { type: 'category-bars'; config: CategoryBarsConfig }
   | { type: 'family-size'; config: FamilySizeConfig }
+  | { type: 'policy-lab'; config: PolicyLabConfig }
   | { type: 'anomaly-pyramid'; config: AnomalyPyramidConfig }
   | { type: 'migration-flow'; config: MigrationFlowConfig }
+  | { type: 'migration-journey'; config: MigrationJourneyConfig }
+  | { type: 'migration-effects'; config: MigrationEffectsConfig }
+  | { type: 'food-history'; config: FoodHistoryConfig }
   | { type: 'explain-back'; config: ExplainBackConfig }
+  | { type: 'growth-plotter'; config: GrowthPlotterConfig }
+  | { type: 'density-calc'; config: DensityCalcConfig }
+  | { type: 'carrying-capacity'; config: CarryingCapacityConfig }
   | { type: 'world-map'; config: WorldMapConfig };
 
 export type InteractionType = Interaction['type'];
@@ -473,6 +707,15 @@ export interface FamilySizeAnswer {
   maxChildren?: number;
 }
 
+export interface PolicyLabAnswer {
+  /** Pass when the projected trend matches (e.g. 'shrinking'). */
+  trend?: Trend;
+  /** Optional: require growth at/under this per-1,000 value. */
+  maxGrowth?: number;
+  /** 'guess' mode: pass when the learner's population estimate is within this many millions of the model's true projection. */
+  guessWithin?: number;
+}
+
 export interface AnomalyPyramidAnswer {
   maleCohorts: [number, number, number, number, number, number, number, number, number];
   femaleCohorts: [number, number, number, number, number, number, number, number, number];
@@ -483,6 +726,21 @@ export interface MigrationFlowAnswer {
   trend?: Trend;
   minNet?: number;
   maxNet?: number;
+}
+
+export interface GrowthPlotterAnswer {
+  /** Pass when the population curve never crosses the food line within the horizon. */
+  averted?: boolean;
+}
+
+export interface DensityCalcAnswer {
+  // solve mode: grade the computed densities against thresholds (people per km²).
+  minArithmetic?: number;
+  maxArithmetic?: number;
+  minPhysiological?: number;
+  maxPhysiological?: number;
+  minAgricultural?: number;
+  maxAgricultural?: number;
 }
 
 export interface WorldMapAnswer {
@@ -506,8 +764,12 @@ export type Answer =
   | ChartPickAnswer
   | CategoryBarsAnswer
   | FamilySizeAnswer
+  | PolicyLabAnswer
   | AnomalyPyramidAnswer
   | MigrationFlowAnswer
+  | GrowthPlotterAnswer
+  | DensityCalcAnswer
+  | CarryingCapacityAnswer
   | WorldMapAnswer;
 
 // ---------------------------------------------------------------------------
@@ -556,6 +818,8 @@ export interface Lesson {
   order: number;
   prerequisites: string[]; // lesson ids
   steps: Step[];
+  /** Skip the post-lesson AI skill check (e.g. synthesis/practice lessons that are themselves the assessment). */
+  skipSkillCheck?: boolean;
 }
 
 export interface Course {

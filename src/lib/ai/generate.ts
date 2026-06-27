@@ -5,8 +5,12 @@
 import type { Schema } from 'firebase/ai';
 import { parseAiJson } from './parseJson';
 import { isAiEnabled, executeGenerateContent } from './provider';
+import { defaultModelForProvider, resolveAiProviderId } from './provider/config';
 
 const DEFAULT_TIMEOUT_MS = 12_000;
+
+/** When the primary openai model is unavailable, retry once with this. */
+const OPENAI_FALLBACK_MODEL = 'gpt-4o-mini';
 
 interface GenerateOpts {
   /** Steers tone/role; grounded, subject-specific instructions live here. */
@@ -43,6 +47,21 @@ function isTransientError(err: unknown): boolean {
   );
 }
 
+/**
+ * True when a request failed because the requested model is unavailable/inaccessible
+ * (e.g. gpt-4o not enabled on this key) — distinct from quota (429) or transient 5xx.
+ */
+function isModelAccessError(err: unknown): boolean {
+  const msg = String(err).toLowerCase();
+  return (
+    msg.includes('404') ||
+    msg.includes('model_not_found') ||
+    msg.includes('does not exist') ||
+    msg.includes('do not have access to model') ||
+    msg.includes('does not have access to model')
+  );
+}
+
 function retryDelayMs(err: unknown, attempt: number): number {
   const msg = String(err);
   const match = msg.match(/retry in (\d+(?:\.\d+)?)s/i);
@@ -64,6 +83,10 @@ async function generateWithRetry(
     ? `${prompt}\n\nReturn JSON only (no markdown) with these keys: ${opts.jsonKeyHint}`
     : prompt;
 
+  const providerId = resolveAiProviderId();
+  let model = opts.model ?? defaultModelForProvider(providerId);
+  let triedModelFallback = false;
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const text = await withTimeout(
@@ -72,7 +95,7 @@ async function generateWithRetry(
           systemInstruction: opts.systemInstruction,
           temperature: opts.temperature,
           maxOutputTokens: opts.maxOutputTokens,
-          model: opts.model,
+          model,
           responseSchema,
           jsonKeyHint: opts.jsonKeyHint,
         }),
@@ -80,6 +103,22 @@ async function generateWithRetry(
       );
       return parse(text);
     } catch (err) {
+      // Primary openai model unavailable → retry the same request once on gpt-4o-mini.
+      if (
+        providerId === 'openai' &&
+        !triedModelFallback &&
+        model !== OPENAI_FALLBACK_MODEL &&
+        isModelAccessError(err)
+      ) {
+        console.warn(
+          `AI model "${model}" unavailable; falling back to ${OPENAI_FALLBACK_MODEL}.`,
+          err,
+        );
+        triedModelFallback = true;
+        model = OPENAI_FALLBACK_MODEL;
+        attempt--; // the fallback switch shouldn't consume a transient-retry attempt
+        continue;
+      }
       if (isQuotaError(err)) {
         console.warn('AI quota/rate limit hit; skipping retries.', err);
         return null;

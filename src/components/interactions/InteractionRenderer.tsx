@@ -14,9 +14,16 @@ import PyramidPick from './PyramidPick';
 import ChartPick from './ChartPick';
 import CategoryBars from './CategoryBars';
 import FamilySize from './FamilySize';
+import PolicyLab from './PolicyLab';
 import AnomalyPyramid from './AnomalyPyramid';
 import MigrationFlow from './MigrationFlow';
+import MigrationJourney from './MigrationJourney';
+import MigrationEffects from './MigrationEffects';
+import FoodHistory from './FoodHistory';
 import ExplainBack from './ExplainBack';
+import GrowthPlotter from './GrowthPlotter';
+import DensityCalc from './DensityCalc';
+import CarryingCapacity from './CarryingCapacity';
 import WorldMap from './WorldMap';
 import type { Interaction, Answer, AnomalyPyramidAnswer, ChartPickAnswer, CurveDrawAnswer, PyramidAnswer, PyramidPickAnswer, ValidationResult, WorldMapAnswer } from '../../types/content';
 import type { InteractionState } from '../../types/interaction';
@@ -111,6 +118,8 @@ export default function InteractionRenderer({
       return <CategoryBars config={interaction.config} onChange={onChange} disabled={disabled} />;
     case 'family-size':
       return <FamilySize config={interaction.config} onChange={onChange} disabled={disabled} />;
+    case 'policy-lab':
+      return <PolicyLab config={interaction.config} onChange={onChange} disabled={disabled} />;
     case 'anomaly-pyramid':
       return (
         <AnomalyPyramid
@@ -129,6 +138,18 @@ export default function InteractionRenderer({
           disabled={disabled}
         />
       );
+    case 'migration-journey':
+      return (
+        <MigrationJourney
+          config={interaction.config}
+          onChange={onChange}
+          disabled={disabled}
+        />
+      );
+    case 'migration-effects':
+      return <MigrationEffects config={interaction.config} onChange={onChange} disabled={disabled} />;
+    case 'food-history':
+      return <FoodHistory config={interaction.config} onChange={onChange} disabled={disabled} />;
     case 'explain-back':
       return (
         <ExplainBack
@@ -138,6 +159,12 @@ export default function InteractionRenderer({
           showSample={explainShowSample}
         />
       );
+    case 'growth-plotter':
+      return <GrowthPlotter config={interaction.config} onChange={onChange} disabled={disabled} />;
+    case 'density-calc':
+      return <DensityCalc config={interaction.config} onChange={onChange} disabled={disabled} />;
+    case 'carrying-capacity':
+      return <CarryingCapacity config={interaction.config} onChange={onChange} disabled={disabled} />;
     case 'world-map':
       return (
         <WorldMap

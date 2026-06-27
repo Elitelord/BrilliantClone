@@ -129,12 +129,14 @@ export const epiTransition: Lesson = {
         type: 'info',
         config: {
           icon: '👶',
+          formula: 'IMR = infant deaths (under age 1) per 1,000 live births',
           body:
-            'Family size is a personal choice and mainly shrinks as the reasons to have children disappear. These changes are enacted over a generation and with cultural shifts.',
+            'Family size is a personal choice and mainly shrinks as the reasons to have children disappear. These changes are enacted over a generation and with cultural shifts. One of the biggest reasons is the infant mortality rate (IMR).',
           points: [
             'On a farm, children provide labor, so families stay large even as death rates fall.',
             'In a city, children require education and other resources, so families get smaller to save on costs',
-            'When infant mortality falls, birth rates drop because children survive longer.',
+            'IMR plays two roles: it is a top development indicator (low IMR = developed) AND a driver of fertility.',
+            'When IMR is high, families expect more children to die, so they require more births; when IMR falls, that need disappears, so births drop.',
             'Increased access to education and paid work for women also contribute to smaller families.',
           ],
         },
@@ -162,54 +164,77 @@ export const epiTransition: Lesson = {
       },
     },
     {
-      id: 'predict-stage4-family',
-      kind: 'predict',
-      prompt: 'Set the typical family size for a developed country in Stage 4.',
-        concepts: ['fertility-transition', 'dtm-stages'],
-      difficulty: 2,
+      id: 'learn-population-policy',
+      kind: 'learn',
+      prompt: 'What if a government wants to move the birth curve faster?',
+      concept:
+        'Births normally fall on their own as a society changes — but that takes a generation. Governments sometimes try to speed the curve up (or push it back up) with deliberate policy. These pull in two opposite directions.',
+      concepts: ['population-policy', 'pro-natalist', 'anti-natalist', 'fertility-transition'],
       interaction: {
-        type: 'family-size',
-        config: { mode: 'adjust', initialChildren: 5, maxChildren: 8 },
-      },
-      answer: { maxChildren: 2 },
-      feedback: {
-        correct: 'Right — a developed Stage 4 country has small families, around two children each.',
-        byOutcome: {
-          'too-many': 'Too many children for a developed country in Stage 4.',
+        type: 'info',
+        config: {
+          icon: '🏛️',
+          body:
+            'Population policy is when a government tries to move the birth curve faster than culture would on its own. It runs in two directions: anti-natalist and pro-natalist.',
+          points: [
+            'Anti-natalist policy lowers births: China\u2019s one-child policy and India\u2019s sterilization campaigns are the classic cases.',
+            'Pro-natalist policy raises births: France, Sweden, and Hungary offer baby bonuses, paid parental leave, and cheaper childcare; Japan adds incentives to fight its shrinking, aging population.',
+          ],
         },
-        hint: 'Drag the count down to a small family.',
+      },
+      feedback: {
+        onExplore:
+          'Next: run a policy lab — toggle anti-natalist and pro-natalist levers and watch a country\u2019s population respond over decades.',
       },
     },
     {
-      id: 'connect-dev-stage',
-      kind: 'connect',
-      prompt: 'Match each major development to the stage it unlocked.',
-      concepts: ['etm', 'fertility-transition', 'dtm-stages'],
-      difficulty: 2,
+      id: 'explore-policy-lab',
+      kind: 'explore',
+      prompt:
+        'This country is booming. Toggle policy levers and watch the running population total respond over the next 50 years.',
+      concept:
+        'Anti-natalist levers (birth caps, free contraception, female education, later marriage) bend the curve down; pro-natalist levers (baby bonuses, parental leave, childcare, immigration) push it up. No single lever flips a fast-growing country — it takes a coherent package.',
+      concepts: ['population-policy', 'pro-natalist', 'anti-natalist'],
+      difficulty: 1,
       interaction: {
-        type: 'match-pairs',
-        config: {
-          instruction: 'Drag each development to the stage it unlocked.',
-          tiles: [
-            { id: 'subsistence', label: 'Settled farming', icon: '🌾' },
-            { id: 'publichealth', label: 'Clean water & vaccines', icon: '💧' },
-            { id: 'smallfamilies', label: 'School, jobs & contraception', icon: '👩\u200d🏫' },
-          ],
-          slots: [
-            { id: 'stage1', label: 'Stage 1', sublabel: 'High & stationary', icon: '1️⃣' },
-            { id: 'stage2', label: 'Stage 2', sublabel: 'Death rates plunge', icon: '2️⃣' },
-            { id: 'stage3', label: 'Stage 3', sublabel: 'Birth rates fall', icon: '3️⃣' },
-          ],
-        },
-      },
-      answer: {
-        pairs: { subsistence: 'stage1', publichealth: 'stage2', smallfamilies: 'stage3' },
+        type: 'policy-lab',
+        config: { showCount: true, initialPopulation: 50, baselineGrowth: 14, decades: 5 },
       },
       feedback: {
+        onExplore:
+          'Pro-natalist policies push the total higher; anti-natalist policies bend it down. One lever rarely does much — strong policy stacks several together.',
+      },
+    },
+    {
+      id: 'solve-policy-guess',
+      kind: 'solve',
+      prompt:
+        'A fast-growing country (50M today) locks in this mix of policies. Estimate its population 50 years from now.',
+      concepts: ['population-policy', 'pro-natalist', 'anti-natalist'],
+      difficulty: 3,
+      interaction: {
+        type: 'policy-lab',
+        config: {
+          mode: 'guess',
+          initialPopulation: 50,
+          baselineGrowth: 14,
+          decades: 5,
+          preset: ['birthcaps', 'femaleed', 'babybonus', 'childcare'],
+          guessMin: 30,
+          guessMax: 120,
+        },
+      },
+      answer: { guessWithin: 8 },
+      feedback: {
         correct:
-          'Exactly — settled farming made Stage 1 possible, public health drives the Stage 2 death plunge, and school + jobs + contraception bring the Stage 3 birth fall.',
-        incorrect: 'Not quite — match each development to the stage it set off.',
-        hint: 'Which change let stable populations first exist? Which cut deaths? Which cut births?',
+          'Right around 74M. The package nearly cancels: the birth caps and female-education drive (strongly anti-natalist) outweigh the baby bonus and cheaper childcare (mildly pro-natalist), so growth eases from the +14 baseline to about +8 per 1,000. The country still grows — just slower — from 50M to roughly 74M over 50 years.',
+        byOutcome: {
+          'too-high':
+            'Too high. You went the right direction, but you leaned too much on the pro-natalist policies.',
+          'too-low':
+            'Too low. The anti-natalist policies slow growth but do not reverse it — net growth stays positive (about +8 per 1,000).',
+        },
+        hint: 'Weigh the two strong anti-natalist policies (birth caps, female education) against the two milder pro-natalist ones (baby bonus, childcare).',
       },
     },
     {
@@ -224,13 +249,13 @@ export const epiTransition: Lesson = {
           multiPerSlot: true,
           instruction: 'Sort each change into the rate it lowers first.',
           tiles: [
+            { id: 'womenwork', label: 'Women in paid work', icon: '💼' },
             { id: 'water', label: 'Clean water', icon: '💧' },
-            { id: 'vaccines', label: 'Vaccines', icon: '💉' },
-            { id: 'sanitation', label: 'Sewers & sanitation', icon: '🚿' },
             { id: 'foodsupply', label: 'Reliable food', icon: '🌽' },
             { id: 'girlsed', label: "Girls' education", icon: '🎓' },
+            { id: 'vaccines', label: 'Vaccines', icon: '💉' },
+            { id: 'sanitation', label: 'Sewers & sanitation', icon: '🚿' },
             { id: 'contraception', label: 'Contraception', icon: '🩺' },
-            { id: 'womenwork', label: 'Women in paid work', icon: '💼' },
           ],
           slots: [
             { id: 'deaths', label: 'Lowers DEATHS', sublabel: 'fast, external', icon: '📉' },

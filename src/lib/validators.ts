@@ -21,7 +21,11 @@ import type {
   ChartPickAnswer,
   AnomalyPyramidAnswer,
   FamilySizeAnswer,
+  PolicyLabAnswer,
   MigrationFlowAnswer,
+  GrowthPlotterAnswer,
+  DensityCalcAnswer,
+  CarryingCapacityAnswer,
   WorldMapAnswer,
 } from '../types/content';
 import type {
@@ -38,8 +42,12 @@ import type {
   ChartPickState,
   CategoryBarsState,
   FamilySizeState,
+  PolicyLabState,
   AnomalyPyramidState,
   MigrationFlowState,
+  GrowthPlotterState,
+  DensityCalcState,
+  CarryingCapacityState,
   WorldMapState,
 } from '../types/interaction';
 import { dominantSector } from './dtm';
@@ -164,6 +172,50 @@ function validateMigrationFlow(
   if (answer.minNet != null) correct = correct && st.netMigration >= answer.minNet;
   if (answer.maxNet != null) correct = correct && st.netMigration <= answer.maxNet;
   return { correct, outcome: st.trend };
+}
+
+function validateGrowthPlotter(
+  answer: GrowthPlotterAnswer | undefined,
+  st: GrowthPlotterState,
+): ValidationResult {
+  if (!answer) return { correct: true };
+  if (answer.averted) {
+    // Pass only when the population curve never catches the food line.
+    return { correct: !st.crosses, outcome: st.crosses ? 'crisis' : 'averted' };
+  }
+  return { correct: true };
+}
+
+function validateCarryingCapacity(
+  answer: CarryingCapacityAnswer | undefined,
+  st: CarryingCapacityState,
+): ValidationResult {
+  if (!answer) return { correct: true };
+  const tol = answer.tolerance ?? Math.max(1, answer.targetCapacity * 0.05);
+  const diff = st.capacity - answer.targetCapacity;
+  const correct = Math.abs(diff) <= tol;
+  const outcome = correct ? 'on-target' : diff > 0 ? 'too-high' : 'too-low';
+  return { correct, outcome };
+}
+
+function validateDensityCalc(
+  answer: DensityCalcAnswer | undefined,
+  st: DensityCalcState,
+): ValidationResult {
+  if (!answer) return { correct: true };
+  let correct = true;
+  let outcome: string | undefined;
+  const fail = (o: string) => {
+    correct = false;
+    outcome = o;
+  };
+  if (answer.minArithmetic != null && st.arithmetic < answer.minArithmetic) fail('arithmetic-low');
+  if (answer.maxArithmetic != null && st.arithmetic > answer.maxArithmetic) fail('arithmetic-high');
+  if (answer.minPhysiological != null && st.physiological < answer.minPhysiological) fail('physiological-low');
+  if (answer.maxPhysiological != null && st.physiological > answer.maxPhysiological) fail('physiological-high');
+  if (answer.minAgricultural != null && st.agricultural < answer.minAgricultural) fail('agricultural-low');
+  if (answer.maxAgricultural != null && st.agricultural > answer.maxAgricultural) fail('agricultural-high');
+  return { correct, outcome };
 }
 
 function validateRateSliders(answer: RateSlidersAnswer | undefined, st: RateSlidersState): ValidationResult {
@@ -339,6 +391,24 @@ function validateFamilySize(answer: FamilySizeAnswer | undefined, st: FamilySize
   return { correct, outcome };
 }
 
+function validatePolicyLab(answer: PolicyLabAnswer | undefined, st: PolicyLabState): ValidationResult {
+  if (!answer) return { correct: true };
+  // Guess mode: grade how close the learner's estimate is to the true projection.
+  if (answer.guessWithin != null) {
+    const guess = st.guess ?? st.population;
+    const diff = guess - st.population;
+    const correct = Math.abs(diff) <= answer.guessWithin;
+    const outcome = correct ? 'spot-on' : diff > 0 ? 'too-high' : 'too-low';
+    return { correct, outcome };
+  }
+  let correct = true;
+  if (answer.trend) correct = correct && st.trend === answer.trend;
+  if (answer.maxGrowth != null) correct = correct && st.growthRate <= answer.maxGrowth;
+  // On a miss, distinguish "picked pro-natalist" from "anti-natalist too weak".
+  const outcome = correct ? st.trend : st.hasProNatalist ? 'pro-natalist' : 'too-weak';
+  return { correct, outcome };
+}
+
 function validateWorldMap(
   answer: WorldMapAnswer | undefined,
   st: WorldMapState,
@@ -381,6 +451,9 @@ export function validate(
     case 'country-model':
     case 'info':
     case 'three-lens':
+    case 'migration-journey':
+    case 'migration-effects':
+    case 'food-history':
       // Explore/read-only: any interaction counts as complete.
       return { correct: true };
     case 'category-bars':
@@ -393,6 +466,8 @@ export function validate(
         return validateFamilySize(answer as FamilySizeAnswer | undefined, state as FamilySizeState);
       }
       return { correct: true };
+    case 'policy-lab':
+      return validatePolicyLab(answer as PolicyLabAnswer | undefined, state as PolicyLabState);
     case 'anomaly-pyramid':
       if (interaction.config.mode === 'adjust') {
         return validateAnomalyPyramid(answer as AnomalyPyramidAnswer | undefined, state as AnomalyPyramidState);
@@ -412,6 +487,18 @@ export function validate(
       return validateNirSlider(answer as NirSliderAnswer | undefined, state as NirSliderState);
     case 'migration-flow':
       return validateMigrationFlow(answer as MigrationFlowAnswer | undefined, state as MigrationFlowState);
+    case 'growth-plotter':
+      return validateGrowthPlotter(answer as GrowthPlotterAnswer | undefined, state as GrowthPlotterState);
+    case 'density-calc':
+      if (interaction.config.mode === 'solve') {
+        return validateDensityCalc(answer as DensityCalcAnswer | undefined, state as DensityCalcState);
+      }
+      return { correct: true };
+    case 'carrying-capacity':
+      if (interaction.config.mode === 'solve') {
+        return validateCarryingCapacity(answer as CarryingCapacityAnswer | undefined, state as CarryingCapacityState);
+      }
+      return { correct: true };
     case 'rate-sliders':
       return validateRateSliders(answer as RateSlidersAnswer | undefined, state as RateSlidersState);
     case 'match-pairs':
@@ -479,6 +566,10 @@ export function resolveWrongFeedback(step: Step, result: ValidationResult): stri
         return 'Not quite — a developed country has small families. Drag the count down.';
       }
       break;
+    case 'policy-lab':
+      return 'Not quite — the population is still rising. A coherent anti-natalist package needs to be strong enough to turn growth into decline.';
+    case 'carrying-capacity':
+      return 'Not quite — the ceiling does not match the target yet. Adjust farmland and technology until the bar lands on the target notch.';
     case 'anomaly-pyramid':
       if (interaction.config.mode === 'adjust') {
         return 'Keep adjusting — the shape isn\'t right yet.';

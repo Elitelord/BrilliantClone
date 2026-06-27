@@ -79,6 +79,64 @@ export const dtmEngine: Lesson = {
       },
     },
     {
+      id: 'learn-tfr',
+      kind: 'learn',
+      prompt: 'A sharper way to measure births.',
+      concept:
+        'The CBR is "crude" because it divides births by everyone — men, children, and the elderly included. A country packed with young adults can post a high CBR even if each woman has only a few children. The total fertility rate (TFR) fixes that distortion.',
+      interaction: {
+        type: 'info',
+        config: {
+          icon: '👩\u200d👧',
+          formula: 'TFR = avg lifetime children per woman (replacement ≈ 2.1)',
+          body:
+            'The total fertility rate (TFR) is the average number of children a woman would have over her lifetime at current rates. About 2.1 is "replacement" — the level that keeps a population steady over the long run.',
+          points: [
+            'CBR counts births against the whole population, so a youthful age structure inflates it.',
+            'TFR counts births per woman, so it is not thrown off by how young or old a country is.',
+            'Below ~2.1, a population eventually shrinks on its own; well above it, the population grows.',
+          ],
+        },
+      },
+      concepts: ['natural-increase'],
+      feedback: {
+        onExplore: 'Next: use TFR to explain why two countries with the same CBR can be very different.',
+      },
+    },
+    {
+      id: 'predict-tfr-cbr',
+      kind: 'predict',
+      prompt:
+        'Countries A and B both have a CBR of 20. But A\u2019s TFR is 3.6, while B\u2019s is only 1.5. How can their crude birth rates be the same?',
+      concepts: ['natural-increase'],
+      difficulty: 2,
+      interaction: {
+        type: 'multiple-choice',
+        config: {
+          options: [
+            { id: 'b-youthful', label: 'B has a younger population, with more women of childbearing age.' },
+            { id: 'a-youthful', label: 'A has a younger population, with more women of childbearing age.' },
+            { id: 'a-more-kids', label: 'Women in A simply have more children than women in B.' },
+            { id: 'same-thing', label: 'CBR and TFR measure the same thing, so one of the numbers must be wrong.' },
+          ],
+        },
+      },
+      answer: { correctId: 'b-youthful' },
+      feedback: {
+        correct:
+          'Right — B\u2019s youthful age structure is packed with women of childbearing age, so its crude rate stays at 20 even though each woman has few children. A reaches the same CBR with high fertility because it has relatively fewer childbearing-age women.',
+        byOutcome: {
+          'a-youthful':
+            'You\'re on the right track. Look back at each country\'s TFRs.',
+          'a-more-kids':
+            'True, but that\u2019s exactly what the TFRs already tell us (3.6 vs 1.5). The puzzle is why their crude rates are equal anyway.',
+          'same-thing':
+            'They measure different things. CBR is births per 1,000 people (distorted by age structure); TFR is children per woman. That\u2019s why both numbers can be right.',
+        },
+        hint: 'Same CBR, but very different per-woman fertility. Which country must have many more women of childbearing age to keep its crude rate up?',
+      },
+    },
+    {
       id: 'predict-stage2',
       kind: 'predict',
       prompt:

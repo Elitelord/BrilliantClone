@@ -5,13 +5,14 @@ import { getCourse, getOrderedLessons } from '../content';
 import { recommendNext } from '../lib/mastery';
 import { goalMetToday } from '../lib/streak';
 import CoursePath from '../components/path/CoursePath';
+import CourseStats from '../components/home/CourseStats';
 import StreakBadge from '../components/habit/StreakBadge';
+import Avatar from '../components/common/Avatar';
 import AppShell from '../components/layout/AppShell';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const profile = useAuthStore((s) => s.profile);
-  const logout = useAuthStore((s) => s.logout);
   const data = useProgressStore((s) => s.data);
   const course = getCourse();
 
@@ -19,23 +20,24 @@ export default function HomePage() {
   const rec = data ? recommendNext(getOrderedLessons(), data.progress) : null;
 
   return (
-    <AppShell className="pb-12">
+    <AppShell className="pb-28">
       {/* header */}
       <header className="flex items-center justify-between py-5">
-        <div>
-          <p className="text-sm text-slate-400">Welcome back,</p>
-          <h1 className="text-xl font-extrabold text-slate-800">{profile?.displayName ?? 'Learner'}</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {streak && <StreakBadge count={streak.count} goalMet={goalMetToday(streak)} />}
+        <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => logout()}
-            className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-200"
+            onClick={() => navigate('/account')}
+            className="active:scale-95"
+            aria-label="Account"
           >
-            Sign out
+            <Avatar avatar={profile?.avatar} size="h-11 w-11" text="text-2xl" />
           </button>
+          <div>
+            <p className="text-sm text-slate-400">Welcome back,</p>
+            <h1 className="text-xl font-extrabold text-slate-800">{profile?.displayName ?? 'Learner'}</h1>
+          </div>
         </div>
+        {streak && <StreakBadge count={streak.count} goalMet={goalMetToday(streak)} />}
       </header>
 
       {/* recommended next */}
@@ -52,6 +54,9 @@ export default function HomePage() {
           {rec.kind !== 'done' && <div className="mt-3 inline-block rounded-full bg-white/20 px-3 py-1 text-sm font-semibold">Start →</div>}
         </button>
       )}
+
+      {/* progress stats */}
+      <CourseStats />
 
       {/* course */}
       <div className="mb-3">

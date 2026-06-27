@@ -4,13 +4,21 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
+  deleteUser,
   GoogleAuthProvider,
   signInWithPopup,
   signOut,
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '../lib/firebase';
-import { clearPendingGuestMerge, markPendingGuestMerge } from '../lib/persistence';
+import {
+  clearPendingGuestMerge,
+  markPendingGuestMerge,
+  updateUserProfileFields,
+  publishLeaderboard,
+  deleteAccountData,
+} from '../lib/persistence';
+import { DEFAULT_AVATAR } from '../lib/avatars';
 import { useProgressStore } from './progressStore';
 import type { UserProfile } from '../types/progress';
 
@@ -26,6 +34,8 @@ interface AuthState {
   signInEmail: (email: string, password: string) => Promise<void>;
   signInGoogle: () => Promise<void>;
   continueAsGuest: (name: string) => void;
+  updateAccount: (fields: { displayName?: string; avatar?: string }) => Promise<void>;
+  deleteAccount: () => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -72,6 +82,8 @@ function friendlyError(e: unknown): string {
       return 'That email address looks invalid.';
     case 'auth/popup-closed-by-user':
       return 'Sign-in was cancelled.';
+    case 'auth/requires-recent-login':
+      return 'For security, please sign out and sign in again before deleting your account.';
     default:
       return (e as Error)?.message ?? 'Something went wrong. Please try again.';
   }
@@ -162,11 +174,63 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const profile: UserProfile = {
       uid,
       displayName: name || 'Guest',
+      avatar: DEFAULT_AVATAR,
       isGuest: true,
       createdAt: Date.now(),
     };
     saveGuest(profile);
     set({ profile, error: null });
+  },
+
+  updateAccount: async ({ displayName, avatar }) => {
+    const current = get().profile;
+    if (!current) return;
+    const next: UserProfile = {
+      ...current,
+      ...(displayName !== undefined ? { displayName: displayName || current.displayName } : {}),
+      ...(avatar !== undefined ? { avatar } : {}),
+    };
+
+    if (!current.isGuest && auth?.currentUser && displayName !== undefined) {
+      try {
+        await updateProfile(auth.currentUser, { displayName: next.displayName });
+      } catch {
+        /* non-fatal: name still saved to our own store */
+      }
+    }
+    if (current.isGuest) saveGuest(next);
+
+    await updateUserProfileFields(next);
+    set({ profile: next });
+
+    const pdata = useProgressStore.getState().data;
+    if (pdata) {
+      useProgressStore.setState({ data: { ...pdata, profile: next } });
+      void publishLeaderboard(next, pdata.streak);
+    }
+  },
+
+  deleteAccount: async () => {
+    const current = get().profile;
+    if (!current) return;
+    set({ error: null });
+    await deleteAccountData(current);
+    if (!current.isGuest && auth?.currentUser) {
+      try {
+        await deleteUser(auth.currentUser);
+      } catch (e) {
+        set({ error: friendlyError(e) });
+        throw e;
+      }
+    }
+    try {
+      localStorage.removeItem(GUEST_KEY);
+    } catch {
+      /* ignore */
+    }
+    clearPendingGuestMerge();
+    useProgressStore.getState().reset();
+    set({ profile: null });
   },
 
   logout: async () => {

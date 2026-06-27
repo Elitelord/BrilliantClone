@@ -28,8 +28,11 @@ export const placeCountry: Lesson = {
   subtitle: 'Classify real countries on the world map',
   concept:
     'Pull together everything from Lessons 1–5 — rates, pyramid shape, why curves move, anomalies, and where the model breaks — to place real countries in the DTM.',
-  order: 6,
-  prerequisites: ['model-breaks'],
+  order: 7,
+  prerequisites: ['why-people-move'],
+  // This capstone IS the assessment — classifying real countries is the practice,
+  // so it doesn't get a separate AI skill check afterward.
+  skipSkillCheck: true,
   steps: [
     {
       id: 'learn-synthesis-framing',

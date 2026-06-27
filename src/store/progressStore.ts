@@ -6,8 +6,9 @@ import {
   persistProgress,
   persistMastery,
   persistStreak,
+  publishLeaderboard,
 } from '../lib/persistence';
-import { updateMasteryForConcepts, computeLessonScore } from '../lib/mastery';
+import { updateMasteryForConcepts, computeLessonScore, countFirstTryCorrect, combinedScore } from '../lib/mastery';
 import {
   reconcileStreak,
   recordProblem,
@@ -31,6 +32,7 @@ interface ProgressState {
   ) => void;
   registerCorrect: (lesson: Lesson, step: Step, isFirstTry?: boolean) => void;
   completeLesson: (lesson: Lesson) => void;
+  recordSkillCheckScore: (lesson: Lesson, result: { correct: number; total: number }) => void;
 }
 
 function emptyLessonProgress(lessonId: string): LessonProgress {
@@ -66,6 +68,8 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     if (JSON.stringify(streak) !== JSON.stringify(data.streak)) {
       void persistStreak(profile, streak);
     }
+    // Keep the public leaderboard entry fresh on every load.
+    void publishLeaderboard(profile, streak);
   },
 
   reset: () => set({ data: null, loaded: false }),
@@ -226,5 +230,20 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     });
     void persistProgress(data.profile, lp);
     void persistStreak(data.profile, streak);
+  },
+
+  // Fold the skill-check result into the persisted lesson score. Only the
+  // combined total is saved; the per-component split is shown on the completion
+  // screen but never persisted.
+  recordSkillCheckScore: (lesson, result) => {
+    const data = get().data;
+    if (!data) return;
+    const existing = data.progress[lesson.id];
+    if (!existing) return;
+    const lessonPart = countFirstTryCorrect(lesson, existing);
+    const score = combinedScore([lessonPart, result]);
+    const lp: LessonProgress = { ...existing, score, updatedAt: Date.now() };
+    set({ data: { ...data, progress: { ...data.progress, [lesson.id]: lp } } });
+    void persistProgress(data.profile, lp);
   },
 }));

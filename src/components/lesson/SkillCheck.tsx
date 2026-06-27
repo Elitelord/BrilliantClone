@@ -109,6 +109,7 @@ export default function SkillCheck({ lesson, onComplete }: Props) {
 
   const q = questions[qIndex];
   const mcConfig = { options: q.options };
+  const correctOptionLabel = q.options.find((o) => o.id === q.correctId)?.label ?? '';
   const userData = useProgressStore.getState().data;
 
   const handleCheck = () => {
@@ -167,7 +168,12 @@ export default function SkillCheck({ lesson, onComplete }: Props) {
             <div className="pointer-events-auto">
               <FeedbackBar
                 tone={result.correct ? 'correct' : 'wrong'}
-                message={result.correct ? q.explanation : 'Not quite — review the explanation and continue.'}
+                message={
+                  result.correct
+                    ? 'Correct!'
+                    : `Not quite — the correct answer was ${correctOptionLabel}.`
+                }
+                concept={q.explanation}
               />
             </div>
           </div>

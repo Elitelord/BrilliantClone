@@ -3,8 +3,8 @@ import { hintLeaksAnswer, safeAuthoredHint } from '../ai/hintGuard';
 import { normalizeHintResponse, parseAiJson } from '../ai/parseJson';
 import { normalizeSkillCheckBatch } from '../ai/features/skillCheck';
 import { playableSteps } from '../ai/lessonSteps';
-import { verifySkillCheckQuestion } from '../ai/verify';
-import type { Step } from '../../types/content';
+import { verifySkillCheckQuestion, skillCheckTemplatesForLesson } from '../ai/verify';
+import type { Lesson, Step } from '../../types/content';
 
 describe('parseAiJson', () => {
   it('strips markdown fences and parses object', () => {
@@ -268,5 +268,105 @@ describe('verifySkillCheckQuestion', () => {
       explanation: 'Wrong claim, right logic.',
     };
     expect(verifySkillCheckQuestion(q)?.correctId).toBe('b');
+  });
+});
+
+describe('verifySkillCheckQuestion net-migration', () => {
+  it('recomputes the overall trend when migration outweighs natural increase', () => {
+    // NIR = 14 − 9 = +5 (growing), but net emigration of −10 flips it to shrinking.
+    const q = {
+      template: 'net-migration' as const,
+      prompt:
+        'A country has CBR 14, CDR 9, and a net migration rate of −10 per 1,000 as workers leave. What happens to its total population?',
+      scenario: { cbr: 14, cdr: 9, netMigration: -10 },
+      options: [
+        { id: 'a', label: 'Grows steadily' },
+        { id: 'b', label: 'Rapid growth' },
+        { id: 'c', label: 'Stays stable' },
+        { id: 'd', label: 'Shrinks / declines' },
+      ],
+      claimedCorrectId: 'a',
+      explanation: 'Net emigration outweighs natural increase.',
+    };
+    expect(verifySkillCheckQuestion(q)?.correctId).toBe('d');
+  });
+});
+
+describe('verifySkillCheckQuestion density-measure', () => {
+  it('matches the option closest to the computed physiological density', () => {
+    // 84,000,000 people ÷ 30,000 km² arable = 2,800 per km².
+    const q = {
+      template: 'density-measure' as const,
+      prompt:
+        'Egypt has ~84 million people but only ~30,000 km² of arable land along the Nile. What is its physiological density?',
+      scenario: {
+        population: 84_000_000,
+        totalLand: 1_000_000,
+        arableLand: 30_000,
+        farmers: 12_000_000,
+        densityType: 'physiological' as const,
+      },
+      options: [
+        { id: 'a', label: '≈ 84 per km²' },
+        { id: 'b', label: '≈ 400 per km²' },
+        { id: 'c', label: '≈ 2,800 per km²' },
+        { id: 'd', label: '≈ 12,000 per km²' },
+      ],
+      claimedCorrectId: 'c',
+      explanation: 'People per unit of arable land is far higher than per total land.',
+    };
+    expect(verifySkillCheckQuestion(q)?.correctId).toBe('c');
+  });
+});
+
+describe('verifySkillCheckQuestion malthus-outcome', () => {
+  it('flags a crisis when exponential population overtakes linear food', () => {
+    const q = {
+      template: 'malthus-outcome' as const,
+      prompt:
+        'Population starts at 100 and grows 3% per year; food starts at 120 and rises by 2 units per year. Over 100 years, what does Malthus predict?',
+      scenario: { pop0: 100, food0: 120, growthRate: 3, foodSlope: 2, horizon: 100 },
+      options: [
+        { id: 'a', label: 'A Malthusian catastrophe as population outstrips food' },
+        { id: 'b', label: 'Food keeps pace and the catastrophe is averted' },
+        { id: 'c', label: 'Population stops growing on its own immediately' },
+        { id: 'd', label: 'Food grows exponentially too' },
+      ],
+      claimedCorrectId: 'a',
+      explanation: 'Exponential growth overtakes a linear food line.',
+    };
+    expect(verifySkillCheckQuestion(q)?.correctId).toBe('a');
+  });
+});
+
+describe('skillCheckTemplatesForLesson', () => {
+  const lessonWith = (concepts: string[]): Lesson =>
+    ({
+      id: 'x',
+      courseId: 'dtm',
+      title: 'X',
+      concept: '',
+      order: 1,
+      prerequisites: [],
+      steps: [
+        { id: 's', kind: 'predict', prompt: 'p', interaction: { type: 'stage-select', config: {} }, concepts, feedback: {} },
+      ],
+    }) as Lesson;
+
+  it('maps density/Malthus concepts to the new L4 templates', () => {
+    const t = skillCheckTemplatesForLesson(lessonWith(['density', 'malthus', 'carrying-capacity', 'neo-malthusian']));
+    expect(t).toContain('density-measure');
+    expect(t).toContain('malthus-outcome');
+    expect(t).not.toContain('pyramid-stage');
+  });
+
+  it('maps migration concepts to net-migration', () => {
+    const t = skillCheckTemplatesForLesson(lessonWith(['migration', 'push-pull', 'refugees', 'natural-increase']));
+    expect(t).toContain('net-migration');
+  });
+
+  it('falls back to core rate templates when nothing matches', () => {
+    const t = skillCheckTemplatesForLesson(lessonWith(['mystery-concept']));
+    expect(t).toEqual(['stage-from-rates', 'population-trend']);
   });
 });

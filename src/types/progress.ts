@@ -51,8 +51,25 @@ export interface UserProfile {
   uid: string;
   displayName: string;
   email?: string;
+  /** Emoji avatar id (see lib/avatars). Optional for legacy/new accounts. */
+  avatar?: string;
   isGuest: boolean;
   createdAt: number;
+}
+
+/**
+ * Public, non-sensitive view of a learner shown on the streak leaderboard.
+ * Intentionally contains ONLY name + avatar + streak — never email or progress.
+ */
+export interface LeaderboardEntry {
+  uid: string;
+  displayName: string;
+  avatar: string;
+  streak: number;
+  longest: number;
+  /** Client-only flags (not persisted). */
+  isYou?: boolean;
+  isFake?: boolean;
 }
 
 export interface UserData {

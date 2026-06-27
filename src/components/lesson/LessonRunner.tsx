@@ -171,6 +171,8 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [locked, setLocked] = useState(false);
   const [finished, setFinished] = useState(false);
+  // Skill-check result for this run — shown as a breakdown on completion (not persisted on its own).
+  const [skillCheckResult, setSkillCheckResult] = useState<{ correct: number; total: number } | null>(null);
   // Bumped to force a fresh remount of selection interactions on "Try again".
   const [attemptKey, setAttemptKey] = useState(0);
   const [feedbackDismissed, setFeedbackDismissed] = useState(false);
@@ -222,6 +224,7 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
     setLocked(false);
     setAttemptKey(0);
     setFinished(false);
+    setSkillCheckResult(null);
     setSessionWrong({});
     setPhase('lesson');
     setHintMessage(null);
@@ -408,7 +411,7 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
   const goNext = () => {
     if (isLast) {
       store.completeLesson(lesson);
-      if (isAiEnabled) {
+      if (isAiEnabled && !lesson.skipSkillCheck) {
         setPhase('skillCheck');
       } else {
         setFinished(true);
@@ -426,7 +429,7 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
   };
 
   if (finished) {
-    return <CompletionScreen lesson={lesson} />;
+    return <CompletionScreen lesson={lesson} skillCheckResult={skillCheckResult} />;
   }
 
   if (phase === 'skillCheck') {
@@ -443,7 +446,14 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
           </button>
           <div className="text-sm font-semibold text-slate-600">{lesson.title} · Skill check</div>
         </div>
-        <SkillCheck lesson={lesson} onComplete={() => setFinished(true)} />
+        <SkillCheck
+          lesson={lesson}
+          onComplete={(result) => {
+            store.recordSkillCheckScore(lesson, result);
+            setSkillCheckResult(result);
+            setFinished(true);
+          }}
+        />
       </div>
     );
   }
@@ -664,13 +674,27 @@ function labelForKind(kind: Step['kind']): string {
   }
 }
 
-function CompletionScreen({ lesson }: { lesson: Lesson }) {
+function CompletionScreen({
+  lesson,
+  skillCheckResult,
+}: {
+  lesson: Lesson;
+  skillCheckResult: { correct: number; total: number } | null;
+}) {
   const navigate = useNavigate();
   const progress = useProgressStore((s) => s.data?.progress[lesson.id]);
   const streak = useProgressStore((s) => s.data?.streak.count ?? 0);
   const userData = useProgressStore((s) => s.data);
-  const score = progress ? computeLessonScore(lesson, progress) : 0;
   const firstTry = progress ? countFirstTryCorrect(lesson, progress) : { correct: 0, total: 0 };
+  const lessonScore = progress ? computeLessonScore(lesson, progress) : 0;
+  const hasSkillCheck = !!skillCheckResult && skillCheckResult.total > 0;
+  const skillCheckScore =
+    hasSkillCheck && skillCheckResult
+      ? Math.round((skillCheckResult.correct / skillCheckResult.total) * 100)
+      : 0;
+  const totalCorrect = firstTry.correct + (skillCheckResult?.correct ?? 0);
+  const totalGraded = firstTry.total + (skillCheckResult?.total ?? 0);
+  const score = totalGraded === 0 ? 100 : Math.round((totalCorrect / totalGraded) * 100);
   const nextLesson = useMemo(() => {
     if (!userData) return null;
     const ordered = getOrderedLessons();
@@ -709,7 +733,7 @@ function CompletionScreen({ lesson }: { lesson: Lesson }) {
         <div className="rounded-2xl bg-slate-50 p-4">
           <div className="text-3xl font-extrabold text-brand-600">{score}%</div>
           <div className="text-xs font-medium text-slate-500">
-            Score (first try) · {firstTry.correct}/{firstTry.total} graded
+            Total score · {totalCorrect}/{totalGraded}
           </div>
         </div>
         <div className="rounded-2xl bg-slate-50 p-4">
@@ -717,6 +741,23 @@ function CompletionScreen({ lesson }: { lesson: Lesson }) {
           <div className="text-xs font-medium text-slate-500">Day streak</div>
         </div>
       </div>
+
+      {hasSkillCheck && (
+        <div className="relative z-10 mt-3 grid w-full grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <div className="text-2xl font-extrabold text-slate-700">{lessonScore}%</div>
+            <div className="text-xs font-medium text-slate-500">
+              Lesson · {firstTry.correct}/{firstTry.total} first try
+            </div>
+          </div>
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <div className="text-2xl font-extrabold text-slate-700">{skillCheckScore}%</div>
+            <div className="text-xs font-medium text-slate-500">
+              Skill check · {skillCheckResult?.correct}/{skillCheckResult?.total}
+            </div>
+          </div>
+        </div>
+      )}
 
       {nextLesson && (
         <div className="relative z-10 mt-6 w-full rounded-2xl border border-brand-100 bg-brand-50 p-4 text-left">

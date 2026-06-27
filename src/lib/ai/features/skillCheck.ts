@@ -6,6 +6,7 @@ import {
   normalizeSkillCheckScenario,
   normalizeSkillCheckTemplate,
   skillCheckVerificationFailureReason,
+  skillCheckTemplatesForLesson,
   type VerifiedSkillCheckQuestion,
   type RawSkillCheckQuestion,
 } from '../verify';
@@ -29,7 +30,7 @@ const SKILL_CHECK_TASK = [
   '- Use AP command terms (BEST explains, most strongly supported, most likely to, primarily because).',
   '- Reward second-order reasoning (cause→effect, implication, comparison), not just classification.',
   '- All 4 distractors must be plausible and target distinct misconceptions; never include filler options.',
-  '- Use all 3 different templates when possible; weight toward concepts the learner struggled with.',
+  '- Use only the templates listed under ALLOWED TEMPLATES below, and spread your 3 questions across them; weight toward concepts the learner struggled with.',
   '- Do NOT reuse a lesson step prompt verbatim.',
   '',
   'TEMPLATES — pick the template that fits each question. The "scenario" object MUST carry the structured numbers (this is how the answer is independently verified), even though the prompt also weaves them into prose:',
@@ -38,6 +39,9 @@ const SKILL_CHECK_TASK = [
   '- pyramid-stage: scenario MUST include numeric stage (1-5) AND a vivid pyramidDescription; option labels MUST contain "Stage 1".."Stage 5".',
   '- sector-dominant: scenario MUST include numeric primary, secondary, tertiary percentages; option labels MUST name the dominant sector (primary/secondary/tertiary).',
   '- cause-of-death: scenario MUST include numeric stage (1-5); option labels MUST name infectious/communicable vs chronic/degenerative causes.',
+  '- net-migration: scenario MUST include numeric cbr, cdr, and netMigration (net migration rate per 1,000, negative for net emigration); option labels MUST read as stable / growing / rapid growth / shrinking. Test how migration flips a country\'s overall population change versus its natural increase.',
+  '- density-measure: scenario MUST use ABSOLUTE counts in consistent units — population (number of people), totalLand and arableLand (km²), farmers (number of people) — plus densityType ("arithmetic" | "physiological" | "agricultural"). The 4 option labels MUST be numeric "≈ N per km²" values, and one of them MUST equal the chosen density computed as people ÷ km² (arithmetic = population÷totalLand, physiological = population÷arableLand, agricultural = farmers÷arableLand). Test why physiological/agricultural density reveals pressure that arithmetic density hides.',
+  '- malthus-outcome: scenario MUST include numeric pop0, food0, growthRate (population % per year), foodSlope (food units added per year), and horizon (years); option labels MUST clearly read as a Malthusian crisis/catastrophe vs a catastrophe averted/food keeps pace. Test whether exponential population outruns linear food.',
   '',
   'FORMAT: exactly 4 options per question with ids a,b,c,d and full descriptive labels (never just "A"). claimedCorrectId MUST be the id of the logically correct option. Keep the explanation to one sharp sentence that names the principle, not just the answer.',
   '',
@@ -241,8 +245,11 @@ async function generateSkillCheckInner(
   progress?: LessonProgress,
 ): Promise<VerifiedSkillCheckQuestion[] | null> {
   const concepts = [...new Set(lesson.steps.flatMap((s) => s.concepts ?? []))];
+  const allowedTemplates = skillCheckTemplatesForLesson(lesson);
   const prompt = [
     SKILL_CHECK_TASK,
+    '',
+    `ALLOWED TEMPLATES for this lesson (use ONLY these): ${allowedTemplates.join(', ')}.`,
     '',
     buildSkillCheckLearnerContext(lesson, progress),
     '',

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { MatchPairsConfig, MatchTile, ValidationResult } from '../../types/content';
 import type { MatchPairsState } from '../../types/interaction';
 import AnomalyPyramidMini from './AnomalyPyramidMini';
@@ -382,18 +383,24 @@ export default function MatchPairs({ config, onChange, disabled, result }: Props
         })}
       </div>
 
-      {/* floating drag preview */}
-      {drag && dragTile && (
-        <div
-          className="pointer-events-none fixed z-50 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-xl border-2 border-brand-400 bg-white p-2 shadow-xl"
-          style={{ left: drag.x, top: drag.y }}
-        >
-          <TileVisual tile={dragTile} className="h-14 w-14 shrink-0 object-contain" />
-          {!dragTile.hideLabel && dragTile.label && (
-            <span className="text-[11px] font-semibold text-slate-600">{dragTile.label}</span>
-          )}
-        </div>
-      )}
+      {/* floating drag preview — portaled to <body> so a transformed ancestor
+          (e.g. framer-motion's `transform` on the step wrapper) doesn't become the
+          containing block for `position: fixed`, which would offset it from the cursor. */}
+      {drag &&
+        dragTile &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-50 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center rounded-xl border-2 border-brand-400 bg-white p-2 shadow-xl"
+            style={{ left: drag.x, top: drag.y }}
+          >
+            <TileVisual tile={dragTile} className="h-14 w-14 shrink-0 object-contain" />
+            {!dragTile.hideLabel && dragTile.label && (
+              <span className="text-[11px] font-semibold text-slate-600">{dragTile.label}</span>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

@@ -12,12 +12,16 @@ import type {
   ChartPickState,
   CategoryBarsState,
   FamilySizeState,
+  PolicyLabState,
   AnomalyPyramidState,
   CurveDrawState,
   NirSliderState,
   RateSlidersState,
   ExplainBackState,
   MigrationFlowState,
+  GrowthPlotterState,
+  DensityCalcState,
+  CarryingCapacityState,
   WorldMapState,
 } from '../../types/interaction';
 import { TREND_LABEL, stageName, SECTOR_LABEL } from '../dtm';
@@ -138,6 +142,16 @@ export function describeInteraction(
       const s = state as FamilySizeState;
       return `Step asks: "${prompt}". Learner set average children per family to ${s.children}. ${target}`;
     }
+    case 'policy-lab': {
+      const s = state as PolicyLabState;
+      const base =
+        `Step asks: "${prompt}". A preset/learner policy mix (${s.activeAnti} anti-natalist, ${s.activePro} pro-natalist) ` +
+        `yields growth ${s.growthRate >= 0 ? '+' : ''}${Math.round(s.growthRate)} per 1,000 (${TREND_LABEL[s.trend]}), ` +
+        `true projected population ${Math.round(s.population)}M.`;
+      const guessPart =
+        s.guess != null ? ` Learner estimated ${Math.round(s.guess)}M.` : '';
+      return `${base}${guessPart} ${target}`;
+    }
     case 'anomaly-pyramid': {
       const s = state as AnomalyPyramidState;
       if (interaction.config.mode === 'adjust' && s.maleCohorts) {
@@ -173,6 +187,29 @@ export function describeInteraction(
         `${s.totalChange >= 0 ? '+' : ''}${s.totalChange.toFixed(1)} (${TREND_LABEL[s.trend]}). ${target}`
       );
     }
+    case 'growth-plotter': {
+      const s = state as GrowthPlotterState;
+      return (
+        `Step asks: "${prompt}". Learner set population growth ${s.growthRate.toFixed(1)}%/yr and food supply ` +
+        `+${s.foodSlope.toFixed(1)}/yr — ${s.crosses ? `the curves cross at year ${s.crossYear} (Malthusian crisis)` : 'the curves never cross (catastrophe averted)'}. ${target}`
+      );
+    }
+    case 'density-calc': {
+      const s = state as DensityCalcState;
+      return (
+        `Step asks: "${prompt}". Learner set population ${s.population}M, total land ${s.totalLand}k km², ` +
+        `arable land ${s.arableLand}k km², farmers ${s.farmers}M → arithmetic ${Math.round(s.arithmetic)}, ` +
+        `physiological ${Math.round(s.physiological)}, agricultural ${Math.round(s.agricultural)} per km². ${target}`
+      );
+    }
+    case 'carrying-capacity': {
+      const s = state as CarryingCapacityState;
+      return (
+        `Step asks: "${prompt}". Learner set farmland ${Math.round(s.land)} × yield ${s.yieldLevel} = food ceiling ` +
+        `${Math.round(s.foodCeiling)}, water ceiling ${Math.round(s.waterCeiling)} → carrying capacity ≈ ` +
+        `${Math.round(s.capacity)} (limited by ${s.binding}). ${target}`
+      );
+    }
     case 'world-map': {
       const s = state as WorldMapState;
       const ids = s.selectedIds?.length ? s.selectedIds.join(', ') : s.selectedId ?? 'none';
@@ -193,6 +230,9 @@ export function describeInteraction(
     case 'info':
     case 'three-lens':
     case 'country-model':
+    case 'migration-journey':
+    case 'migration-effects':
+    case 'food-history':
       return `Step asks: "${prompt}". Explore/read-only step — learner is viewing content.`;
     default: {
       const _exhaustive: never = interaction;

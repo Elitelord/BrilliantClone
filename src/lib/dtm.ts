@@ -534,3 +534,68 @@ export const SECTOR_LABEL: Record<Sector, string> = {
   secondary: 'Industry (secondary)',
   tertiary: 'Services (tertiary)',
 };
+
+// ---- Population density (Topic 2.2) --------------------------------------
+// The three densities students confuse. All inputs share one unit system
+// (people, and land area in the same unit), so the ratios are comparable.
+//  - arithmetic    = people per unit of TOTAL land (raw crowding)
+//  - physiological = people per unit of ARABLE land (pressure on the food system)
+//  - agricultural  = FARMERS per unit of ARABLE land (subsistence vs mechanized)
+export interface DensityInputs {
+  population: number;
+  totalLand: number;
+  arableLand: number;
+  farmers: number;
+}
+
+export interface DensityResult {
+  arithmetic: number;
+  physiological: number;
+  agricultural: number;
+}
+
+export function computeDensities(inputs: DensityInputs): DensityResult {
+  const { population, totalLand, arableLand, farmers } = inputs;
+  const safe = (num: number, den: number) => (den > 0 ? num / den : 0);
+  return {
+    arithmetic: safe(population, totalLand),
+    physiological: safe(population, arableLand),
+    agricultural: safe(farmers, arableLand),
+  };
+}
+
+// ---- Malthus: population vs food (Topic 2.6) -----------------------------
+// Population grows exponentially; food grows linearly. The "crisis point" is the
+// first year population catches the food line — the Malthusian catastrophe.
+export interface MalthusParams {
+  pop0: number; // starting population index
+  food0: number; // starting food capacity (people the land can feed)
+  growthRate: number; // population growth rate, % per year
+  foodSlope: number; // food capacity added per year (linear)
+  horizon: number; // years to project
+}
+
+export interface GrowthCrossover {
+  crosses: boolean;
+  crossYear: number | null;
+}
+
+export function populationAt(pop0: number, growthRate: number, year: number): number {
+  return pop0 * Math.pow(1 + growthRate / 100, year);
+}
+
+export function foodAt(food0: number, foodSlope: number, year: number): number {
+  return food0 + foodSlope * year;
+}
+
+export function malthusCrossover(params: MalthusParams): GrowthCrossover {
+  const { pop0, food0, growthRate, foodSlope, horizon } = params;
+  for (let t = 0; t <= horizon; t++) {
+    const pop = populationAt(pop0, growthRate, t);
+    const food = foodAt(food0, foodSlope, t);
+    if (pop >= food) {
+      return { crosses: true, crossYear: t };
+    }
+  }
+  return { crosses: false, crossYear: null };
+}

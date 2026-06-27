@@ -13,7 +13,7 @@ export function resolveOpenAiApiKey(): string | undefined {
 export function defaultModelForProvider(id: AiProviderId): string {
   const custom = import.meta.env.VITE_AI_MODEL?.trim();
   if (custom) return custom;
-  if (id === 'openai') return 'gpt-4o-mini';
+  if (id === 'openai') return 'gpt-4o';
   return 'gemini-flash-latest';
 }
 

@@ -1,10 +1,12 @@
 // Recompute correct answers for AI-generated skill-check questions from DTM logic.
-import type { McOption } from '../../types/content';
+import type { Lesson, McOption } from '../../types/content';
 import {
   classifyPyramidControls,
   stageFromRates,
   trendFromGap,
   dominantSector,
+  computeDensities,
+  malthusCrossover,
   TREND_LABEL,
   stageName,
   SECTOR_LABEL,
@@ -16,7 +18,12 @@ export type SkillCheckTemplate =
   | 'population-trend'
   | 'pyramid-stage'
   | 'sector-dominant'
-  | 'cause-of-death';
+  | 'cause-of-death'
+  | 'net-migration'
+  | 'density-measure'
+  | 'malthus-outcome';
+
+export type DensityType = 'arithmetic' | 'physiological' | 'agricultural';
 
 export interface SkillCheckScenario {
   cbr?: number;
@@ -28,6 +35,20 @@ export interface SkillCheckScenario {
   pyramidDescription?: string;
   /** Optional pyramid control widths for classifyPyramidControls. */
   widths?: [number, number, number, number];
+  // net-migration: net migration rate per 1,000 (positive = net in-migration).
+  netMigration?: number;
+  // density-measure
+  population?: number;
+  totalLand?: number;
+  arableLand?: number;
+  farmers?: number;
+  densityType?: DensityType;
+  // malthus-outcome
+  pop0?: number;
+  food0?: number;
+  growthRate?: number; // population growth, % per year
+  foodSlope?: number; // food units added per year (linear)
+  horizon?: number; // years to project
 }
 
 function readNum(v: unknown): number | undefined {
@@ -69,6 +90,17 @@ export function normalizeSkillCheckScenario(raw: unknown): SkillCheckScenario {
     (v) => typeof v === 'string' && v.trim(),
   ) as string | undefined;
 
+  const densityRaw = [o.densityType, o.density_type, o.measure, o.densityMeasure].find(
+    (v) => typeof v === 'string' && v.trim(),
+  ) as string | undefined;
+  let densityType: DensityType | undefined;
+  if (densityRaw) {
+    const d = densityRaw.toLowerCase();
+    if (d.includes('arith')) densityType = 'arithmetic';
+    else if (d.includes('agri')) densityType = 'agricultural';
+    else if (d.includes('phys')) densityType = 'physiological';
+  }
+
   return {
     cbr: pick(['cbr', 'CBR', 'birthRate', 'birth', 'crudeBirthRate', 'birth_rate']),
     cdr: pick(['cdr', 'CDR', 'deathRate', 'death', 'crudeDeathRate', 'death_rate']),
@@ -78,6 +110,17 @@ export function normalizeSkillCheckScenario(raw: unknown): SkillCheckScenario {
     tertiary: pick(['tertiary', 'tertiaryPercent', 'tertiarySector', 'tertiary_pct']),
     pyramidDescription: desc?.trim(),
     widths,
+    netMigration: pick(['netMigration', 'net_migration', 'netMigrationRate', 'migrationRate', 'nmr']),
+    population: pick(['population', 'pop', 'populationMillions', 'people', 'totalPopulation']),
+    totalLand: pick(['totalLand', 'total_land', 'landArea', 'area', 'totalArea', 'land']),
+    arableLand: pick(['arableLand', 'arable_land', 'arable', 'farmland', 'cropland', 'arableArea']),
+    farmers: pick(['farmers', 'farmerCount', 'agriculturalWorkers', 'farmWorkers', 'farmPopulation']),
+    densityType,
+    pop0: pick(['pop0', 'initialPopulation', 'startPopulation', 'startingPopulation']),
+    food0: pick(['food0', 'initialFood', 'startFood', 'startingFood']),
+    growthRate: pick(['growthRate', 'populationGrowth', 'growthPct', 'growthPercent', 'popGrowthRate']),
+    foodSlope: pick(['foodSlope', 'foodGrowth', 'foodIncrease', 'foodRate']),
+    horizon: pick(['horizon', 'years', 'timeHorizon', 'projectionYears']),
   };
 }
 
@@ -106,6 +149,19 @@ export function normalizeSkillCheckTemplate(raw: unknown): SkillCheckTemplate | 
     causeofdeath: 'cause-of-death',
     mortality: 'cause-of-death',
     'epi-transition': 'cause-of-death',
+    'net-migration': 'net-migration',
+    netmigration: 'net-migration',
+    migration: 'net-migration',
+    'migration-balance': 'net-migration',
+    'density-measure': 'density-measure',
+    densitymeasure: 'density-measure',
+    density: 'density-measure',
+    'population-density': 'density-measure',
+    'malthus-outcome': 'malthus-outcome',
+    malthusoutcome: 'malthus-outcome',
+    malthus: 'malthus-outcome',
+    'malthusian-theory': 'malthus-outcome',
+    'carrying-capacity': 'malthus-outcome',
   };
   return aliases[key] ?? null;
 }
@@ -219,6 +275,65 @@ function findOptionForCause(options: McOption[], stage: number): string | null {
   return null;
 }
 
+/** Match the option whose embedded number is closest to `value` (within 20%). */
+function findOptionForNumber(options: McOption[], value: number): string | null {
+  if (!Number.isFinite(value)) return null;
+  let best: { id: string; diff: number } | null = null;
+  for (const opt of options) {
+    const n = readNum(opt.label);
+    if (n === undefined) continue;
+    const diff = Math.abs(n - value);
+    if (!best || diff < best.diff) best = { id: opt.id, diff };
+  }
+  if (!best) return null;
+  const rel = value !== 0 ? best.diff / Math.abs(value) : best.diff;
+  // Reject when the computed value isn't actually represented among the options.
+  return rel <= 0.2 ? best.id : null;
+}
+
+const MALTHUS_CRISIS_WORDS = [
+  'crisis',
+  'catastrophe',
+  'famine',
+  'collapse',
+  'overshoot',
+  'shortage',
+  'starv',
+  'outstrip',
+  'positive check',
+  'exceed',
+];
+const MALTHUS_AVERT_WORDS = [
+  'avert',
+  'averted',
+  'avoid',
+  'sustain',
+  'no crisis',
+  'no catastrophe',
+  'kept in check',
+  'keeps pace',
+  'keep pace',
+  'keeps up',
+  'prevented',
+  'enough food',
+  'sufficient',
+];
+
+function findOptionForMalthus(options: McOption[], crisis: boolean): string | null {
+  const want = crisis ? MALTHUS_CRISIS_WORDS : MALTHUS_AVERT_WORDS;
+  const avoid = crisis ? MALTHUS_AVERT_WORDS : MALTHUS_CRISIS_WORDS;
+  // Prefer an option that signals the right outcome and not the opposite.
+  for (const opt of options) {
+    const l = norm(opt.label);
+    if (want.some((w) => l.includes(w)) && !avoid.some((w) => l.includes(w))) return opt.id;
+  }
+  for (const opt of options) {
+    const l = norm(opt.label);
+    if (want.some((w) => l.includes(w))) return opt.id;
+  }
+  return null;
+}
+
 /** Short reason a question failed verification — for dev console only. */
 export function skillCheckVerificationFailureReason(q: RawSkillCheckQuestion): string {
   if (!q.prompt?.trim()) return 'missing prompt';
@@ -259,9 +374,80 @@ export function computeCorrectOptionId(q: RawSkillCheckQuestion): string | null 
       const stage = scenario.stage ?? 4;
       return findOptionForCause(options, stage);
     }
+    case 'net-migration': {
+      if (scenario.cbr == null || scenario.cdr == null || scenario.netMigration == null) return null;
+      // Total change combines natural increase (CBR−CDR) with the net migration rate.
+      const trend = trendFromGap(scenario.cbr - scenario.cdr + scenario.netMigration);
+      return findOptionForTrend(options, trend);
+    }
+    case 'density-measure': {
+      if (scenario.population == null) return null;
+      const densities = computeDensities({
+        population: scenario.population,
+        totalLand: scenario.totalLand ?? 0,
+        arableLand: scenario.arableLand ?? 0,
+        farmers: scenario.farmers ?? 0,
+      });
+      const type = scenario.densityType ?? 'physiological';
+      const value = densities[type];
+      if (!Number.isFinite(value) || value <= 0) return null;
+      return findOptionForNumber(options, value);
+    }
+    case 'malthus-outcome': {
+      if (
+        scenario.pop0 == null ||
+        scenario.food0 == null ||
+        scenario.growthRate == null ||
+        scenario.foodSlope == null
+      ) {
+        return null;
+      }
+      const { crosses } = malthusCrossover({
+        pop0: scenario.pop0,
+        food0: scenario.food0,
+        growthRate: scenario.growthRate,
+        foodSlope: scenario.foodSlope,
+        horizon: scenario.horizon ?? 100,
+      });
+      return findOptionForMalthus(options, crosses);
+    }
     default:
       return null;
   }
+}
+
+/**
+ * The skill-check templates appropriate to a lesson, inferred from its concept
+ * tags. Keeps generated questions on-topic (e.g. a density lesson gets density /
+ * Malthus questions, not DTM-stage ones). Falls back to the core rate templates.
+ */
+export function skillCheckTemplatesForLesson(lesson: Lesson): SkillCheckTemplate[] {
+  const tags = lesson.steps
+    .flatMap((s) => s.concepts ?? [])
+    .join(' ')
+    .toLowerCase();
+  const out = new Set<SkillCheckTemplate>();
+
+  if (/pyramid|dependency|momentum|anomal|cohort|age-band|age band|sex-ratio/.test(tags)) {
+    out.add('pyramid-stage');
+  }
+  if (/density|carrying-capacity/.test(tags)) out.add('density-measure');
+  if (/malthus|boserup|carrying-capacity/.test(tags)) out.add('malthus-outcome');
+  if (/migration|push-pull|refugee|remittance|brain-drain|diaspora|idp|asylum|intervening/.test(tags)) {
+    out.add('net-migration');
+  }
+  if (/sector|primary|secondary|tertiary|employment/.test(tags)) out.add('sector-dominant');
+  if (/cause-of-death|etm|epidemio|mortality|fertility|imr/.test(tags)) out.add('cause-of-death');
+  if (/stage|cbr|cdr|nir|natural-increase|tfr|doubling|transition|\brate/.test(tags)) {
+    out.add('stage-from-rates');
+    out.add('population-trend');
+  }
+
+  if (out.size === 0) {
+    out.add('stage-from-rates');
+    out.add('population-trend');
+  }
+  return [...out];
 }
 
 export function verifySkillCheckQuestion(q: RawSkillCheckQuestion): VerifiedSkillCheckQuestion | null {
