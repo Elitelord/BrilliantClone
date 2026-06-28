@@ -28,15 +28,6 @@ export default {
         // landscape phones; ceiling avoids huge charts on tall desktops.
         chart: 'clamp(190px, 46vh, 430px)',
       },
-      keyframes: {
-        'pop-in': {
-          '0%': { transform: 'scale(0.9)', opacity: '0' },
-          '100%': { transform: 'scale(1)', opacity: '1' },
-        },
-      },
-      animation: {
-        'pop-in': 'pop-in 0.2s ease-out',
-      },
     },
   },
   plugins: [],

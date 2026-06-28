@@ -9,6 +9,7 @@ import {
   publishLeaderboard,
 } from '../lib/persistence';
 import { updateMasteryForConcepts, computeLessonScore, countFirstTryCorrect, combinedScore } from '../lib/mastery';
+import type { Confidence } from '../lib/metacognition/confidence';
 import {
   reconcileStreak,
   recordProblem,
@@ -30,11 +31,11 @@ interface ProgressState {
     step: Step,
     detail?: { outcome?: string; summary?: string },
   ) => void;
-  registerCorrect: (lesson: Lesson, step: Step, isFirstTry?: boolean) => void;
+  registerCorrect: (lesson: Lesson, step: Step, isFirstTry?: boolean, confidence?: Confidence) => void;
   completeLesson: (lesson: Lesson) => void;
   recordSkillCheckScore: (lesson: Lesson, result: { correct: number; total: number }) => void;
   /** Phase 3: record a spaced-review answer — updates concept mastery + schedule (+ streak on correct). */
-  registerReviewResult: (concepts: string[], correct: boolean) => void;
+  registerReviewResult: (concepts: string[], correct: boolean, confidence?: Confidence) => void;
 }
 
 function emptyLessonProgress(lessonId: string): LessonProgress {
@@ -113,10 +114,11 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
       playState: 'in_progress',
       currentStepIndex: 0,
       // Fresh scoring run — session wrong-counts are not carried over from prior plays.
+      // The prior `score` (best) is preserved so the home/path mastery % doesn't drop to
+      // 0 just for re-opening a finished lesson; a re-run can only raise it (see below).
       completedStepIds: [],
       firstTryCorrect: {},
       attempts: {},
-      score: 0,
       updatedAt: Date.now(),
     };
     set({ data: { ...data, progress: { ...data.progress, [lesson.id]: lp } } });
@@ -167,7 +169,7 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     void persistProgress(data.profile, lp);
   },
 
-  registerCorrect: (lesson, step, isFirstTry) => {
+  registerCorrect: (lesson, step, isFirstTry, confidence) => {
     const data = get().data;
     if (!data) return;
     const existing = data.progress[lesson.id] ?? emptyLessonProgress(lesson.id);
@@ -184,7 +186,8 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
       playState: 'in_progress',
       firstTryCorrect,
       completedStepIds,
-      score: computeLessonScore(lesson, scored),
+      // A review run never lowers the persisted best score.
+      score: Math.max(existing.score, computeLessonScore(lesson, scored)),
       updatedAt: Date.now(),
     };
 
@@ -196,7 +199,7 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
       progress: { ...data.progress, [lesson.id]: lp },
     };
     if (step.concepts?.length) {
-      const mastery = updateMasteryForConcepts(data.mastery, step.concepts, true);
+      const mastery = updateMasteryForConcepts(data.mastery, step.concepts, true, confidence);
       next = { ...next, mastery };
       void persistMastery(data.profile, step.concepts.map((c) => mastery[c]));
     }
@@ -223,7 +226,7 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
       playState: 'not_started',
       currentStepIndex: 0,
       firstTryCorrect,
-      score: computeLessonScore(lesson, scored),
+      score: Math.max(existing.score, computeLessonScore(lesson, scored)),
       updatedAt: Date.now(),
     };
     const streak = applyDailyCompletion(data.streak);
@@ -249,11 +252,11 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     void persistProgress(data.profile, lp);
   },
 
-  registerReviewResult: (concepts, correct) => {
+  registerReviewResult: (concepts, correct, confidence) => {
     const data = get().data;
     if (!data) return;
     const mastery = concepts.length
-      ? updateMasteryForConcepts(data.mastery, concepts, correct)
+      ? updateMasteryForConcepts(data.mastery, concepts, correct, confidence)
       : data.mastery;
     // A correct recall counts toward the daily goal, like a lesson problem.
     const streak = correct ? recordProblem(data.streak) : data.streak;

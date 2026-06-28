@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { Lock, Star, Check } from 'lucide-react';
 
 import type { Lesson } from '../../types/content';
 
@@ -62,9 +63,16 @@ export default function LessonNode({
   onSelect,
 }: Props) {
   const [hovered, setHovered] = useState(false);
+  const reduceMotion = useReducedMotion();
   const locked = status === 'locked';
 
-  const glyph = locked ? '🔒' : status === 'complete' ? (mastered ? '★' : '✓') : index + 1;
+  const glyph = locked ? (
+    <Lock className="h-5 w-5" strokeWidth={2.5} />
+  ) : status === 'complete' ? (
+    mastered ? <Star className="h-6 w-6 fill-current" strokeWidth={1.5} /> : <Check className="h-7 w-7" strokeWidth={3} />
+  ) : (
+    index + 1
+  );
 
   // Responsive popover placement. The card width scales with the canvas. We prefer
   // a card to the SIDE of the square (aligned to its height), but when neither side
@@ -130,9 +138,13 @@ export default function LessonNode({
         {recommended && !hovered && (
           <motion.div
             initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: [0, -4, 0] }}
+            animate={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 1, y: [0, -4, 0] }}
             exit={{ opacity: 0 }}
-            transition={{ y: { repeat: Infinity, duration: 1.4 }, opacity: { duration: 0.2 } }}
+            transition={
+              reduceMotion
+                ? { opacity: { duration: 0.2 } }
+                : { y: { repeat: Infinity, duration: 1.4 }, opacity: { duration: 0.2 } }
+            }
             className="absolute -top-9 z-30 whitespace-nowrap rounded-full bg-brand-600 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-lg shadow-brand-600/30"
           >
             Start here
@@ -146,13 +158,13 @@ export default function LessonNode({
         onClick={onSelect}
         disabled={locked}
         aria-label={lesson.title}
-        className={`relative flex items-center justify-center rounded-3xl border-2 border-b-[6px] text-2xl font-black transition ${SQUARE[status]} ${
+        className={`relative flex items-center justify-center rounded-3xl border-2 border-b-[6px] text-2xl font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 ${SQUARE[status]} ${
           locked ? 'cursor-not-allowed' : 'cursor-pointer'
         }`}
         style={{ width: NODE, height: NODE }}
       >
         {/* pulse ring for the recommended lesson */}
-        {recommended && (
+        {recommended && !reduceMotion && (
           <motion.span
             aria-hidden
             className="absolute inset-0 rounded-3xl ring-4 ring-brand-400"

@@ -8,6 +8,8 @@ import { useProgressStore } from '../../store/progressStore';
 import MultipleChoice from '../interactions/MultipleChoice';
 import FeedbackBar from './FeedbackBar';
 import Spinner from '../common/Spinner';
+import Button from '../common/Button';
+import { useEnterKey } from '../../lib/hooks/useEnterKey';
 import type { VerifiedSkillCheckQuestion } from '../../lib/ai/verify';
 
 interface Props {
@@ -27,6 +29,10 @@ export default function SkillCheck({ lesson, onComplete }: Props) {
   const [done, setDone] = useState(false);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+
+  // Enter advances the skill check (action refreshed per render path; see useEnterKey).
+  const enterRef = useRef<() => void>(() => {});
+  useEnterKey(() => enterRef.current());
 
   useEffect(() => {
     let cancelled = false;
@@ -69,6 +75,7 @@ export default function SkillCheck({ lesson, onComplete }: Props) {
   }
 
   if (genFailed) {
+    enterRef.current = () => onCompleteRef.current({ correct: 0, total: 0 });
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
         <p className="text-lg font-semibold text-slate-800">Skill check unavailable</p>
@@ -76,13 +83,9 @@ export default function SkillCheck({ lesson, onComplete }: Props) {
           We couldn&apos;t generate verified questions this time. Your lesson progress is saved — you can
           continue.
         </p>
-        <button
-          type="button"
-          onClick={() => onCompleteRef.current({ correct: 0, total: 0 })}
-          className="mt-6 w-full max-w-sm rounded-2xl bg-brand-600 py-4 text-base font-bold text-white shadow-lg shadow-brand-600/20"
-        >
+        <Button onClick={() => onCompleteRef.current({ correct: 0, total: 0 })} className="mt-6 max-w-sm">
           Continue
-        </button>
+        </Button>
       </div>
     );
   }
@@ -90,19 +93,16 @@ export default function SkillCheck({ lesson, onComplete }: Props) {
   if (!questions) return null;
 
   if (done) {
+    enterRef.current = () => onComplete({ correct: correctCount, total: questions.length });
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
         <div className="text-4xl font-extrabold text-brand-600">
           {correctCount} / {questions.length}
         </div>
         <p className="mt-2 text-slate-600">Skill check complete — nice work!</p>
-        <button
-          type="button"
-          onClick={() => onComplete({ correct: correctCount, total: questions.length })}
-          className="mt-6 w-full max-w-sm rounded-2xl bg-brand-600 py-4 text-base font-bold text-white shadow-lg shadow-brand-600/20"
-        >
+        <Button onClick={() => onComplete({ correct: correctCount, total: questions.length })} className="mt-6 max-w-sm">
           Continue
-        </button>
+        </Button>
       </div>
     );
   }
@@ -143,6 +143,8 @@ export default function SkillCheck({ lesson, onComplete }: Props) {
     setLocked(false);
   };
 
+  enterRef.current = locked ? goNext : mcState?.selectedId ? handleCheck : () => {};
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex-none px-4 pb-2 pt-2">
@@ -179,22 +181,13 @@ export default function SkillCheck({ lesson, onComplete }: Props) {
           </div>
         )}
         {locked ? (
-          <button
-            type="button"
-            onClick={goNext}
-            className="w-full rounded-2xl bg-brand-600 py-4 text-base font-bold text-white shadow-lg shadow-brand-600/20"
-          >
+          <Button onClick={goNext}>
             {qIndex >= questions.length - 1 ? 'See results' : 'Next question'}
-          </button>
+          </Button>
         ) : (
-          <button
-            type="button"
-            onClick={handleCheck}
-            disabled={!mcState?.selectedId}
-            className="w-full rounded-2xl bg-brand-600 py-4 text-base font-bold text-white shadow-lg shadow-brand-600/20 disabled:bg-slate-300 disabled:shadow-none"
-          >
+          <Button onClick={handleCheck} disabled={!mcState?.selectedId}>
             Check
-          </button>
+          </Button>
         )}
       </div>
     </div>

@@ -86,6 +86,13 @@ export function prereqsFor(id: string): string[] {
   return CONCEPTS[id]?.prereqs ?? [];
 }
 
+/** Concept ids that list `id` among their prerequisites — i.e. what `id` unlocks. */
+export function dependentsOf(id: string): string[] {
+  return Object.values(CONCEPTS)
+    .filter((info) => info.prereqs.includes(id))
+    .map((info) => info.id);
+}
+
 export function conceptMasteryTarget(id: string): number {
   return CONCEPTS[id]?.masteryTarget ?? MASTERY_THRESHOLD / 100;
 }

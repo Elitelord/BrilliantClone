@@ -1,6 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { X } from 'lucide-react';
 import type { Frq } from '../../types/frq';
 import { partToExplainConfig } from '../../types/frq';
 import type { ExplainBackState } from '../../types/interaction';
@@ -9,6 +10,7 @@ import { isAiEnabled } from '../../lib/ai';
 import { gradeAutoCheck } from '../../lib/frqGrading';
 import { gradeFrqPart } from '../../lib/ai/features/frqGrade';
 import { recordFrqResult } from '../../lib/frqProgress';
+import { useEnterKey } from '../../lib/hooks/useEnterKey';
 import ExplainBack from '../interactions/ExplainBack';
 import FrqStimulusView from './FrqStimulus';
 import FeedbackBar, { type FeedbackTone } from '../lesson/FeedbackBar';
@@ -33,7 +35,7 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
           className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
           aria-label="Exit FRQ practice"
         >
-          ✕
+          <X className="h-5 w-5" />
         </button>
         <div className="text-sm font-semibold text-slate-600">{title}</div>
       </div>
@@ -117,6 +119,19 @@ export default function FrqRunner({ frq }: { frq: Frq }) {
     record(earned);
     goNext();
   };
+
+  // Enter advances: submit while answering, continue once graded. (Self-grade has two
+  // choices, so it's excluded; Cmd/Ctrl+Enter submits from the free-text box.)
+  useEnterKey(
+    () => {
+      if (status === 'answering') {
+        if (canSubmit) void handlePrimary();
+      } else if (status === 'graded') {
+        goNext();
+      }
+    },
+    !done && (status === 'answering' || status === 'graded'),
+  );
 
   if (done) {
     return (

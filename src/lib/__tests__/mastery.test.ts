@@ -206,6 +206,18 @@ describe('updateMasteryForConcepts', () => {
     expect(next['natural-increase'].lastSeen).toBe(Date.now());
   });
 
+  it('awards less strength for a low-confidence correct answer', () => {
+    const certain = updateMasteryForConcepts({}, ['natural-increase'], true, 'certain');
+    const likely = updateMasteryForConcepts({}, ['natural-increase'], true, 'likely');
+    const guess = updateMasteryForConcepts({}, ['natural-increase'], true, 'guess');
+    expect(certain['natural-increase'].strength).toBeCloseTo(0.34);
+    expect(likely['natural-increase'].strength).toBeCloseTo(0.34 * 0.65);
+    expect(guess['natural-increase'].strength).toBeCloseTo(0.34 * 0.3);
+    // a guessed correct also holds its schedule (comes back sooner) — box 0 either way here,
+    // but the strength gap means lower retrievability and an earlier effective resurface.
+    expect(guess['natural-increase'].strength).toBeLessThan(certain['natural-increase'].strength);
+  });
+
   it('decreases strength and increments wrongCount on wrong answer', () => {
     const prev = {
       'natural-increase': {

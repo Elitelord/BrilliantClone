@@ -7,7 +7,7 @@ import { validate, resolveFeedback, resolveWrongFeedback } from '../../lib/valid
 import { canCheck, isSelectionStep } from './stepInput';
 import { useProgressStore } from '../../store/progressStore';
 import { getOrderedLessons } from '../../content';
-import { recommendNext, computeLessonScore, countFirstTryCorrect, isLessonComplete, isLessonUnlocked } from '../../lib/mastery';
+import { recommendNext, computeLessonScore, countFirstTryCorrect, isLessonComplete, isLessonUnlocked, MASTERY_THRESHOLD } from '../../lib/mastery';
 import { isAiEnabled, buildStepContext, describeInteraction } from '../../lib/ai';
 import { playableSteps, toFullStepIndex, toPlayableStepIndex } from '../../lib/ai/lessonSteps';
 import { safeAuthoredHint } from '../../lib/ai/hintGuard';
@@ -15,6 +15,11 @@ import { retrievability } from '../../lib/scheduler';
 import { allowHint } from '../../lib/scaffold';
 import { getWrongAnswerNudge } from '../../lib/ai/features/wrongAnswerNudge';
 import { gradeExplanation } from '../../lib/ai/features/explainBack';
+import { useEnterKey } from '../../lib/hooks/useEnterKey';
+import type { Confidence } from '../../lib/metacognition/confidence';
+import ConfidenceChips from './ConfidenceChips';
+import { teachingStepFor } from '../../lib/review/teachingSteps';
+import { X } from 'lucide-react';
 import InteractionRenderer from '../interactions/InteractionRenderer';
 import StepProgress from './StepProgress';
 import FeedbackBar, { type FeedbackTone } from './FeedbackBar';
@@ -99,6 +104,8 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
   const store = useProgressStore();
 
   const [stepIndex, setStepIndex] = useState(0);
+  const [confidence, setConfidence] = useState<Confidence | null>(null);
+  const [showReteach, setShowReteach] = useState(false);
   const [iState, setIState] = useState<InteractionState | null>(null);
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [locked, setLocked] = useState(false);
@@ -297,6 +304,12 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
     }
   };
 
+  // Enter triggers the footer's primary action. The action depends on render-path state
+  // computed below, so it's stored in a ref and refreshed each render (a direct hook call
+  // would be conditional given the early returns for the finished / skill-check phases).
+  const enterActionRef = useRef<() => void>(() => {});
+  useEnterKey(() => enterActionRef.current());
+
   const handleCheck = async () => {
     if (step.interaction.type === 'explain-back') {
       clearExplainRetrySchedule();
@@ -313,7 +326,7 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
     if (r.correct) {
       setLocked(true);
       const firstTry = (sessionWrong[step.id] ?? 0) === 0;
-      store.registerCorrect(lesson, step, firstTry);
+      store.registerCorrect(lesson, step, firstTry, confidence ?? undefined);
     } else {
       setSessionWrong((prev) => ({ ...prev, [step.id]: (prev[step.id] ?? 0) + 1 }));
       store.registerWrong(lesson, step, wrongAttemptDetail(r.outcome));
@@ -334,6 +347,8 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
     setExplainAiFeedback(null);
     setExplainSkipped(false);
     setWrongNudge(null);
+    setConfidence(null);
+    setShowReteach(false);
     if (isSelectionStep(step)) {
       setIState(null);
       setAttemptKey((k) => k + 1);
@@ -358,13 +373,17 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
     setResult(null);
     setLocked(false);
     setAttemptKey(0);
+    setConfidence(null);
+    setShowReteach(false);
   };
 
   if (finished) {
+    enterActionRef.current = () => {};
     return <CompletionScreen lesson={lesson} skillCheckResult={skillCheckResult} />;
   }
 
   if (phase === 'skillCheck') {
+    enterActionRef.current = () => {}; // SkillCheck handles its own keyboard
     return (
       <div className="fixed inset-y-0 left-1/2 flex w-full max-w-2xl -translate-x-1/2 flex-col overflow-hidden bg-slate-50 lg:max-w-6xl">
         <div className="pt-safe flex flex-none items-center gap-3 px-4 pb-3">
@@ -444,6 +463,25 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
   const conceptHintText =
     step.concept ?? (isExplore && step.feedback.onExplore ? step.feedback.onExplore : undefined);
 
+  // Error-driven re-teaching: after repeated misses, offer to re-read the idea that first
+  // taught this step's concept before the next attempt (don't just retry the same item).
+  const reteachTarget = (() => {
+    if (!(result && !result.correct) || (sessionWrong[step.id] ?? 0) < 2) return null;
+    for (const conceptId of stepConcepts) {
+      const t = teachingStepFor(conceptId);
+      if (t && t.step.id !== step.id) return t;
+    }
+    return null;
+  })();
+
+  // Mirror the footer button's logic so Enter does whatever the visible primary button does.
+  enterActionRef.current = () => {
+    if (showContinue) goNext();
+    else if (showExplainSkip || explainGradingBusy) return; // mid-grading
+    else if (result && !result.correct && result.outcome !== 'grade-unavailable') handleRetry();
+    else if (!checkDisabled && !isGrading) void handleCheck();
+  };
+
   return (
     <div className="fixed inset-y-0 left-1/2 flex w-full max-w-2xl -translate-x-1/2 flex-col overflow-hidden bg-slate-50 lg:max-w-6xl">
       {/* top bar — stays pinned so progress is always visible */}
@@ -454,7 +492,7 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
           className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
           aria-label="Exit lesson"
         >
-          ✕
+          <X className="h-5 w-5" />
         </button>
         <StepProgress current={stepIndex} total={activeSteps.length} />
       </div>
@@ -515,6 +553,40 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
               </div>
             </div>
 
+            {reteachTarget && (
+              <div className="mt-4">
+                {!showReteach ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowReteach(true)}
+                    className="w-full rounded-xl border border-sky-200 bg-sky-50 py-2.5 text-sm font-semibold text-sky-800"
+                  >
+                    Stuck? Review the idea
+                  </button>
+                ) : (
+                  <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4">
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-sky-700">
+                      Review the idea
+                    </div>
+                    <p className="text-sm font-semibold text-slate-700">{reteachTarget.step.prompt}</p>
+                    {(reteachTarget.step.concept ?? reteachTarget.step.feedback?.onExplore) && (
+                      <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                        {reteachTarget.step.concept ?? reteachTarget.step.feedback?.onExplore}
+                      </p>
+                    )}
+                    <div className="mt-3 rounded-2xl border border-slate-100 bg-white p-3">
+                      <InteractionRenderer
+                        key={`reteach-${reteachTarget.step.id}`}
+                        interaction={reteachTarget.step.interaction}
+                        onChange={() => {}}
+                        disabled
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
           </motion.div>
         </AnimatePresence>
       </div>
@@ -545,6 +617,9 @@ export default function LessonRunner({ lesson }: { lesson: Lesson }) {
               />
             </div>
           </div>
+        )}
+        {!isExplore && step.interaction.type !== 'explain-back' && !locked && !result && !checkDisabled && (
+          <ConfidenceChips value={confidence} onChange={setConfidence} />
         )}
         {showHintButton && !showContinue && (
           <button
@@ -661,7 +736,7 @@ function CompletionScreen({
 
   return (
     <div className="fixed inset-y-0 left-1/2 flex w-full max-w-2xl -translate-x-1/2 flex-col overflow-hidden bg-slate-50 lg:max-w-3xl">
-      <Celebration />
+      <Celebration mastered={score >= MASTERY_THRESHOLD} />
       <div className="pb-safe relative z-10 flex-1 overflow-y-auto px-6 py-8">
       <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center text-center">
       <motion.div

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { X } from 'lucide-react';
 import type { Step, ValidationResult } from '../../types/content';
 import type { InteractionState, McState } from '../../types/interaction';
 import { validate, resolveFeedback, resolveWrongFeedback } from '../../lib/validators';
@@ -15,11 +16,14 @@ import { retrievability } from '../../lib/scheduler';
 import { generateReviewItems, attributeReviewConcept } from '../../lib/ai/features/reviewItems';
 import type { VerifiedSkillCheckQuestion } from '../../lib/ai/verify';
 import { canCheck } from '../lesson/stepInput';
+import { useEnterKey } from '../../lib/hooks/useEnterKey';
 import InteractionRenderer from '../interactions/InteractionRenderer';
 import MultipleChoice from '../interactions/MultipleChoice';
 import FeedbackBar, { type FeedbackTone } from '../lesson/FeedbackBar';
 import StepProgress from '../lesson/StepProgress';
 import Spinner from '../common/Spinner';
+import ConfidenceChips from '../lesson/ConfidenceChips';
+import type { Confidence } from '../../lib/metacognition/confidence';
 
 const MAX_AUTHORED = 6;
 const MAX_AI = 2;
@@ -39,7 +43,7 @@ function Shell({ title, children }: { title: string; children: ReactNode }) {
           className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
           aria-label="Exit review"
         >
-          ✕
+          <X className="h-5 w-5" />
         </button>
         <div className="text-sm font-semibold text-slate-600">{title}</div>
       </div>
@@ -59,11 +63,17 @@ export default function MixedReview() {
   const [mcState, setMcState] = useState<McState | null>(null);
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [locked, setLocked] = useState(false);
+  const [confidence, setConfidence] = useState<Confidence | null>(null);
   const [correctCount, setCorrectCount] = useState(0);
   const [recall, setRecall] = useState<{ before: number; after: number; gain: number; count: number } | null>(
     null,
   );
   const beforeRef = useRef<Record<string, number>>({});
+
+  // Enter triggers the current primary action; the action is refreshed each render path
+  // (the phase early-returns below would otherwise make a direct hook call conditional).
+  const enterActionRef = useRef<() => void>(() => {});
+  useEnterKey(() => enterActionRef.current());
 
   useEffect(() => {
     let cancelled = false;
@@ -162,13 +172,14 @@ export default function MixedReview() {
     setMcState(null);
     setResult(null);
     setLocked(false);
+    setConfidence(null);
   };
 
   const recordAndLock = (concepts: string[], r: ValidationResult) => {
     setResult(r);
     setLocked(true);
     if (r.correct) setCorrectCount((c) => c + 1);
-    store.registerReviewResult(concepts, r.correct);
+    store.registerReviewResult(concepts, r.correct, confidence ?? undefined);
   };
 
   if (phase === 'loading') {
@@ -183,6 +194,7 @@ export default function MixedReview() {
   }
 
   if (phase === 'empty') {
+    enterActionRef.current = () => navigate('/');
     return (
       <Shell title="Daily review">
         <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
@@ -206,6 +218,7 @@ export default function MixedReview() {
 
   if (phase === 'done') {
     const total = entries.length;
+    enterActionRef.current = () => navigate('/');
     return (
       <Shell title="Daily review">
         <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
@@ -253,6 +266,16 @@ export default function MixedReview() {
   if (!entry) return null;
   const checkDisabled =
     entry.kind === 'authored' ? !canCheck(entry.step, iState) : !mcState?.selectedId;
+
+  const submitCurrent = () => {
+    if (entry.kind === 'ai') {
+      if (!mcState?.selectedId) return;
+      recordAndLock(entry.concepts, { correct: mcState.selectedId === entry.question.correctId });
+    } else {
+      recordAndLock(entry.concepts, validate(entry.step.interaction, entry.step.answer, iState));
+    }
+  };
+  enterActionRef.current = locked ? goNext : checkDisabled ? () => {} : submitCurrent;
 
   let feedback: { tone: FeedbackTone; message: string; concept?: string } | null = null;
   if (result) {
@@ -341,6 +364,9 @@ export default function MixedReview() {
             </div>
           </div>
         )}
+        {!locked && !result && !checkDisabled && (
+          <ConfidenceChips value={confidence} onChange={setConfidence} />
+        )}
         {locked ? (
           <button
             type="button"
@@ -352,16 +378,7 @@ export default function MixedReview() {
         ) : (
           <button
             type="button"
-            onClick={() => {
-              if (entry.kind === 'ai') {
-                if (!mcState?.selectedId) return;
-                recordAndLock(entry.concepts, {
-                  correct: mcState.selectedId === entry.question.correctId,
-                });
-              } else {
-                recordAndLock(entry.concepts, validate(entry.step.interaction, entry.step.answer, iState));
-              }
-            }}
+            onClick={submitCurrent}
             disabled={checkDisabled}
             className="w-full rounded-2xl bg-brand-600 py-4 text-base font-bold text-white shadow-lg shadow-brand-600/20 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
           >

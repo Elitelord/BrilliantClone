@@ -59,11 +59,14 @@ export function computeNextDue(
   prev: Schedulable | undefined,
   correct: boolean,
   now: number,
+  advance = true,
 ): number {
   if (!correct) return Math.round(now + RELEARN_DAYS * DAY_MS);
   const box = boxFromRecord(prev);
   const wasDue = prev?.nextDue == null || now >= prev.nextDue;
-  const nextBox = wasDue
+  // A low-confidence correct (advance=false) holds the box even when due, so it comes back
+  // at the same short interval rather than climbing the ladder.
+  const nextBox = wasDue && advance
     ? Math.min(box + 1, INTERVALS_DAYS.length - 1)
     : Math.max(box, 0);
   return Math.round(now + INTERVALS_DAYS[nextBox] * DAY_MS);

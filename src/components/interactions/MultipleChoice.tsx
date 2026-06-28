@@ -23,6 +23,22 @@ export default function MultipleChoice({ config, onChange, disabled, result }: P
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Number-key selection (1–9) for keyboard/desktop users.
+  useEffect(() => {
+    if (disabled) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement;
+      if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')) return;
+      const n = Number(e.key);
+      if (!Number.isInteger(n) || n < 1 || n > config.options.length) return;
+      const opt = config.options[n - 1];
+      setSelected(opt.id);
+      onChangeRef.current({ selectedId: opt.id });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [disabled, config.options]);
+
   const revealed = !!result;
   const isWrong = revealed && !result?.correct;
 
@@ -45,7 +61,7 @@ export default function MultipleChoice({ config, onChange, disabled, result }: P
               setSelected(opt.id);
               onChangeRef.current({ selectedId: opt.id });
             }}
-            className={`flex flex-col items-center rounded-2xl border-2 p-3 transition disabled:opacity-90 ${styleFor(opt.id)}`}
+            className={`flex flex-col items-center rounded-2xl border-2 p-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1 disabled:opacity-90 ${styleFor(opt.id)}`}
           >
             {opt.pyramid && (
               <PyramidMini
@@ -67,7 +83,7 @@ export default function MultipleChoice({ config, onChange, disabled, result }: P
 
   return (
     <div className="flex w-full flex-col gap-2.5">
-      {config.options.map((opt) => (
+      {config.options.map((opt, i) => (
         <button
           key={opt.id}
           type="button"
@@ -76,11 +92,21 @@ export default function MultipleChoice({ config, onChange, disabled, result }: P
             setSelected(opt.id);
             onChangeRef.current({ selectedId: opt.id });
           }}
-          className={`flex items-center justify-between rounded-2xl border-2 px-4 py-3.5 text-left text-[15px] font-medium transition disabled:opacity-90 ${styleFor(opt.id)} ${
+          className={`flex items-center justify-between rounded-2xl border-2 px-4 py-3.5 text-left text-[15px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-1 disabled:opacity-90 ${styleFor(opt.id)} ${
             selected === opt.id ? 'text-brand-800' : 'text-slate-700'
           }`}
         >
-          <span>{opt.label}</span>
+          <span className="flex items-center gap-2.5">
+            {i < 9 && (
+              <span
+                aria-hidden
+                className="hidden h-5 w-5 flex-none items-center justify-center rounded-md bg-slate-100 text-[11px] font-bold text-slate-400 sm:flex"
+              >
+                {i + 1}
+              </span>
+            )}
+            <span>{opt.label}</span>
+          </span>
           {revealed && result?.correct && selected === opt.id && <span aria-hidden>✓</span>}
           {isWrong && selected === opt.id && <span aria-hidden>✕</span>}
         </button>

@@ -1,6 +1,7 @@
 import type { Lesson } from '../types/content';
 import type { LessonProgress, MasteryRecord } from '../types/progress';
 import { computeNextDue, dueConcepts } from './scheduler';
+import { confidenceFactor, advancesSchedule, type Confidence } from './metacognition/confidence';
 
 export const MASTERY_THRESHOLD = 60; // lesson score (%) to count as "mastered"
 export const REVIEW_WRONG_THRESHOLD = 2; // wrong attempts on a step -> surface review
@@ -127,14 +128,17 @@ export function updateMasteryForConcepts(
   map: Record<string, MasteryRecord>,
   conceptIds: string[],
   correct: boolean,
+  confidence?: Confidence,
 ): Record<string, MasteryRecord> {
   const next = { ...map };
   const now = Date.now();
   for (const conceptId of conceptIds) {
     const prev = next[conceptId];
     const prevStrength = prev?.strength ?? 0;
+    // A correct answer the learner only guessed at earns less strength (and below, isn't
+    // treated as a fully spaced success) — so it resurfaces sooner.
     const strength = correct
-      ? Math.min(1, prevStrength + 0.34)
+      ? Math.min(1, prevStrength + 0.34 * confidenceFactor(confidence))
       : Math.max(0, prevStrength - 0.2);
     next[conceptId] = {
       conceptId,
@@ -142,7 +146,7 @@ export function updateMasteryForConcepts(
       lastSeen: now,
       wrongCount: (prev?.wrongCount ?? 0) + (correct ? 0 : 1),
       // Phase 3: schedule the next spaced review (SM-2-lite). See lib/scheduler.ts.
-      nextDue: computeNextDue(prev, correct, now),
+      nextDue: computeNextDue(prev, correct, now, advancesSchedule(confidence)),
     };
   }
   return next;

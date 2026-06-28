@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom';
+import { Map, Trophy, type LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Avatar from '../common/Avatar';
 
-const items = [
-  { to: '/', label: 'Learn', icon: '🗺️', end: true },
-  { to: '/leaderboard', label: 'Leaderboard', icon: '🏆', end: false },
-  { to: '/account', label: 'Account', icon: '', end: false },
+const items: { to: string; label: string; Icon: LucideIcon | null; end: boolean }[] = [
+  { to: '/', label: 'Learn', Icon: Map, end: true },
+  { to: '/leaderboard', label: 'Leaderboard', Icon: Trophy, end: false },
+  { to: '/account', label: 'Account', Icon: null, end: false },
 ];
 
 export default function NavBar() {
@@ -27,7 +28,7 @@ export default function NavBar() {
           >
             {({ isActive }) => (
               <>
-                {it.to === '/account' ? (
+                {it.Icon === null ? (
                   <Avatar
                     avatar={profile?.avatar}
                     size="h-7 w-7"
@@ -35,9 +36,7 @@ export default function NavBar() {
                     className={isActive ? 'ring-2 ring-brand-400' : ''}
                   />
                 ) : (
-                  <span className={`text-2xl leading-7 transition ${isActive ? 'scale-110' : ''}`}>
-                    {it.icon}
-                  </span>
+                  <it.Icon className={`h-6 w-6 transition ${isActive ? 'scale-110' : ''}`} strokeWidth={2.25} />
                 )}
                 <span>{it.label}</span>
               </>

@@ -61,6 +61,15 @@ describe('computeNextDue', () => {
     expect(computeNextDue(prev, true, now)).toBe(Math.round(now + INTERVALS_DAYS[1] * DAY));
   });
 
+  it('holds the box on a due-but-low-confidence correct (advance=false)', () => {
+    const prev = atBox(1); // 3-day interval
+    const now = prev.nextDue!; // exactly due — would normally advance to box 2
+    // a guessed correct keeps box 1 so it comes back at the same short interval
+    expect(computeNextDue(prev, true, now, false)).toBe(Math.round(now + INTERVALS_DAYS[1] * DAY));
+    // while a confident correct advances to box 2
+    expect(computeNextDue(prev, true, now, true)).toBe(Math.round(now + INTERVALS_DAYS[2] * DAY));
+  });
+
   it('caps at the top of the ladder', () => {
     const top = INTERVALS_DAYS.length - 1;
     const prev = atBox(top);
