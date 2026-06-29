@@ -58,6 +58,9 @@ export function isLessonMastered(lesson: Lesson, progress?: LessonProgress): boo
 }
 
 export function isLessonUnlocked(lesson: Lesson, progressMap: Record<string, LessonProgress>): boolean {
+  // A lesson you've already finished is always re-enterable, even if a prerequisite's
+  // completion flag is missing/stale — you earned access by completing it once.
+  if (isLessonComplete(progressMap[lesson.id])) return true;
   if (lesson.prerequisites.length === 0) return true;
   return lesson.prerequisites.every((pid) => isLessonComplete(progressMap[pid]));
 }

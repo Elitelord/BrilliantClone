@@ -115,6 +115,12 @@ describe('isLessonUnlocked', () => {
       }),
     ).toBe(true);
   });
+
+  it('keeps an already-completed lesson enterable even if a prerequisite is not complete', () => {
+    // l3 finished, but its prerequisite l2 has no completion flag (stale/missing data).
+    const map = { [l3.id]: makeLessonProgress(l3.id, { finishedOnce: true }) };
+    expect(isLessonUnlocked(l3, map)).toBe(true);
+  });
 });
 
 describe('recommendNext', () => {
